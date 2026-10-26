@@ -1,0 +1,26 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Rahasia: JANGAN pernah commit ---
+.env
+.env.*
+!.env.example
+
+# --- Database (bisa berisi data warga) ---
+instance/
+*.sqlite3
+*.sqlite3-journal
+
+# --- Dokumen warga (ciphertext maupun plaintext) ---
+private_storage/*
+!private_storage/.gitkeep
+
+# --- Editor / OS ---
+.DS_Store
+.idea/
+.vscode/
