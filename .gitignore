@@ -1,34 +1,26 @@
-# Python test/build artifacts
+# --- Python ---
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.pytest-tmp/
+*.egg-info/
 .venv/
-.coverage
-htmlcov/
+venv/
+.pytest_cache/
 
-# Local secrets and configuration
+# --- Rahasia: JANGAN pernah commit ---
 .env
 .env.*
 !.env.example
-*.key
-*.pem
 
-# Local database and SQLite sidecar files
-instance/*
-!instance/.gitkeep
+# --- Database (bisa berisi data warga) ---
+instance/
 *.sqlite3
-*.sqlite3-*
-*.db
-*.db-*
+*.sqlite3-journal
 
-# Runtime data (keep directory placeholders)
+# --- Dokumen warga (ciphertext maupun plaintext) ---
 private_storage/*
 !private_storage/.gitkeep
-benchmarks/results/*
-!benchmarks/results/.gitkeep
 
-# Local logs and editor settings
-*.log
+# --- Editor / OS ---
+.DS_Store
 .idea/
 .vscode/

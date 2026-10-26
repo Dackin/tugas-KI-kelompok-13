@@ -1,189 +1,145 @@
-"""Unit tests for private encrypted file storage.
+"""Anggota 4: uji penyimpanan privat dan download melalui route terproteksi.
 
-Protected download route tests remain the responsibility of the integration owner.
+Kontrak yang diuji (lihat docs/PEMBAGIAN_TUGAS.md):
+- upload  : POST /tickets/<id>/dokumen, multipart field `file`, `algorithm` opsional
+- download: GET /documents/<id>/download
+- `Document.ciphertext_path` relatif terhadap PRIVATE_STORAGE_DIR
+- route download memeriksa login + kepemilikan SEBELUM membaca file
+
+Tes ini merah selama Anggota 2 (crypto/storage) dan Anggota 3 (route) belum
+selesai. Itu wajar: tes ini adalah spesifikasi.
 """
 
-import json
-from hashlib import sha256
+import io
+from pathlib import Path
 
-import pytest
+from app import db
+from app.models import Document, Resident, Ticket, User
 
-from app.crypto import CryptoError
-from app.crypto import aes, des, rc4
-from app.crypto import storage
-
-
-TEST_KEY = bytes(range(32))
-CONTEXT = {
-    "ticket_id": 11,
-    "uploaded_by_user_id": 7,
-    "original_filename": "surat-dummy.pdf",
-}
-ALGORITHMS = (aes.ALGORITHM, des.ALGORITHM, rc4.ALGORITHM)
+PLAINTEXT = b"RAHASIA_KTP_WARGA_A " + b"isi-dokumen-" * 40
+NAMA_ASLI = "ktp_asli_warga_a.pdf"
 
 
-def _decrypt(stored, storage_root, *, context=CONTEXT, algorithm=None, metadata=None):
-    return storage.decrypt_file(
-        ciphertext_path=stored.ciphertext_path,
-        storage_root=storage_root,
-        key=TEST_KEY,
-        context=context,
-        algorithm=algorithm or stored.algorithm,
-        metadata=metadata or stored.crypto_metadata_json,
-    )
-
-
-@pytest.mark.parametrize("algorithm", ALGORITHMS)
-@pytest.mark.parametrize("plaintext", [b"", bytes(range(256)), b"file" * 2049])
-def test_stored_file_decrypts_identically(tmp_path, algorithm, plaintext):
-    stored = storage.encrypt_file(
-        plaintext,
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
-        algorithm=algorithm,
-    )
-
-    decrypted = _decrypt(stored, tmp_path)
-
-    assert decrypted == plaintext
-    assert sha256(decrypted).digest() == sha256(plaintext).digest()
-    assert stored.algorithm == algorithm
-    assert json.loads(stored.crypto_metadata_json)["algorithm"] == algorithm
-
-
-@pytest.mark.parametrize("algorithm", ALGORITHMS)
-def test_storage_writes_only_ciphertext_under_random_name(tmp_path, algorithm):
-    plaintext = b"dummy resident document"
-    malicious_context = {
-        **CONTEXT,
-        "original_filename": "../../outside-secret.pdf",
-    }
-
-    stored = storage.encrypt_file(
-        plaintext,
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=malicious_context,
-        algorithm=algorithm,
-    )
-
-    physical_path = tmp_path / stored.ciphertext_path
-    assert physical_path.parent == tmp_path
-    assert physical_path.suffix == ".bin"
-    assert len(physical_path.stem) == 32
-    assert stored.ciphertext_path != malicious_context["original_filename"]
-    assert physical_path.read_bytes() != plaintext
-    assert not (tmp_path.parent / "outside-secret.pdf").exists()
-
-
-@pytest.mark.parametrize("algorithm", ALGORITHMS)
-def test_storage_never_reuses_physical_name(tmp_path, algorithm):
-    first = storage.encrypt_file(
-        b"same", storage_root=tmp_path, key=TEST_KEY, context=CONTEXT, algorithm=algorithm
-    )
-    second = storage.encrypt_file(
-        b"same", storage_root=tmp_path, key=TEST_KEY, context=CONTEXT, algorithm=algorithm
-    )
-
-    assert first.ciphertext_path != second.ciphertext_path
-    assert (tmp_path / first.ciphertext_path).read_bytes() != (
-        tmp_path / second.ciphertext_path
-    ).read_bytes()
-
-
-@pytest.mark.parametrize("algorithm", ALGORITHMS)
-def test_storage_rejects_modified_ciphertext(tmp_path, algorithm):
-    stored = storage.encrypt_file(
-        b"dummy document",
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
-        algorithm=algorithm,
-    )
-    physical_path = tmp_path / stored.ciphertext_path
-    ciphertext = physical_path.read_bytes()
-    physical_path.write_bytes(bytes([ciphertext[0] ^ 1]) + ciphertext[1:])
-
-    with pytest.raises(CryptoError, match="decryption failed"):
-        _decrypt(stored, tmp_path)
-
-
-@pytest.mark.parametrize("algorithm", ALGORITHMS)
-def test_storage_authenticates_document_context(tmp_path, algorithm):
-    stored = storage.encrypt_file(
-        b"dummy document",
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
-        algorithm=algorithm,
-    )
-    wrong_context = {**CONTEXT, "ticket_id": CONTEXT["ticket_id"] + 1}
-
-    with pytest.raises(CryptoError, match="decryption failed"):
-        _decrypt(stored, tmp_path, context=wrong_context)
-
-
-def test_storage_rejects_algorithm_metadata_mismatch(tmp_path):
-    stored = storage.encrypt_file(
-        b"dummy document",
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
-    )
-
-    with pytest.raises(CryptoError, match="decryption failed"):
-        _decrypt(stored, tmp_path, algorithm=des.ALGORITHM)
-
-
-@pytest.mark.parametrize("unsafe_path", ["../secret.bin", "nested/secret.bin"])
-def test_storage_rejects_path_traversal(tmp_path, unsafe_path):
-    stored = storage.encrypt_file(
-        b"dummy document",
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
-    )
-
-    with pytest.raises(CryptoError, match="decryption failed"):
-        storage.decrypt_file(
-            ciphertext_path=unsafe_path,
-            storage_root=tmp_path,
-            key=TEST_KEY,
-            context=CONTEXT,
-            algorithm=stored.algorithm,
-            metadata=stored.crypto_metadata_json,
+def _tiket_warga_a(app) -> int:
+    with app.app_context():
+        user = User.query.filter_by(username="warga_a").one()
+        resident = Resident.query.filter_by(user_id=user.id).one()
+        tiket = Ticket(
+            resident_id=resident.id,
+            service_type="Surat Domisili",
+            description="Lampiran KTP",
         )
+        db.session.add(tiket)
+        db.session.commit()
+        return tiket.id
 
 
-def test_storage_rejects_missing_file_and_invalid_metadata(tmp_path):
-    stored = storage.encrypt_file(
-        b"dummy document",
-        storage_root=tmp_path,
-        key=TEST_KEY,
-        context=CONTEXT,
+def _unggah(client, tiket_id, isi=PLAINTEXT, nama=NAMA_ASLI, algoritma="AES-GCM"):
+    return client.post(
+        f"/tickets/{tiket_id}/dokumen",
+        data={"file": (io.BytesIO(isi), nama), "algorithm": algoritma},
+        content_type="multipart/form-data",
     )
 
-    with pytest.raises(CryptoError, match="decryption failed"):
-        _decrypt(stored, tmp_path, metadata="not-json")
 
-    (tmp_path / stored.ciphertext_path).unlink()
-    with pytest.raises(CryptoError, match="decryption failed"):
-        _decrypt(stored, tmp_path)
+def _dokumen_terakhir(app) -> Document:
+    with app.app_context():
+        dokumen = Document.query.order_by(Document.id.desc()).first()
+        assert dokumen is not None, "upload tidak membuat baris Document"
+        db.session.expunge(dokumen)
+        return dokumen
 
 
-def test_storage_removes_temporary_file_after_atomic_write_failure(tmp_path, monkeypatch):
-    def fail_replace(source, destination):
-        raise OSError("simulated write failure")
+def _path_ciphertext(app, dokumen: Document) -> Path:
+    dasar = Path(app.config["PRIVATE_STORAGE_DIR"])
+    relatif = Path(dokumen.ciphertext_path)
+    return relatif if relatif.is_absolute() else dasar / relatif
 
-    monkeypatch.setattr(storage.os, "replace", fail_replace)
 
-    with pytest.raises(OSError, match="simulated write failure"):
-        storage.encrypt_file(
-            b"dummy document",
-            storage_root=tmp_path,
-            key=TEST_KEY,
-            context=CONTEXT,
+def _semua_file_storage(app) -> list[Path]:
+    dasar = Path(app.config["PRIVATE_STORAGE_DIR"])
+    return [p for p in dasar.rglob("*") if p.is_file()]
+
+
+def test_upload_menyimpan_ciphertext_tanpa_plaintext(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+    r = _unggah(client, tiket_id)
+    assert r.status_code in (200, 302), r.get_data(as_text=True)[:300]
+
+    berkas = _semua_file_storage(app)
+    assert berkas, "tidak ada file tersimpan di PRIVATE_STORAGE_DIR"
+    for path in berkas:
+        assert PLAINTEXT not in path.read_bytes(), f"plaintext bocor di {path}"
+
+
+def test_nama_file_asli_tidak_dipakai_sebagai_nama_penyimpanan(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+    _unggah(client, tiket_id)
+
+    berkas = _semua_file_storage(app)
+    assert berkas, "upload tidak menyimpan file apa pun"
+    for path in berkas:
+        assert "ktp_asli" not in path.name, f"nama file asli terpakai: {path.name}"
+
+
+def test_file_tidak_disimpan_di_folder_publik(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+    _unggah(client, tiket_id)
+
+    dokumen = _dokumen_terakhir(app)
+    path = _path_ciphertext(app, dokumen).resolve()
+    folder_statis = (Path(app.root_path) / "static").resolve()
+    assert folder_statis not in path.parents, f"ciphertext berada di folder publik: {path}"
+
+
+def test_pemilik_bisa_unduh_dan_isi_identik(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+    _unggah(client, tiket_id)
+    dokumen = _dokumen_terakhir(app)
+
+    r = client.get(f"/documents/{dokumen.id}/download")
+    assert r.status_code == 200
+    assert r.data == PLAINTEXT
+    assert "attachment" in r.headers.get("Content-Disposition", "")
+
+
+def test_ciphertext_rusak_tidak_menghasilkan_plaintext(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+    _unggah(client, tiket_id)
+    dokumen = _dokumen_terakhir(app)
+
+    path = _path_ciphertext(app, dokumen)
+    assert path.is_file(), "file ciphertext tidak ditemukan"
+    path.write_bytes(b"rusak")
+
+    r = client.get(f"/documents/{dokumen.id}/download")
+    assert r.status_code == 400, "IntegrityError harus dipetakan ke 400, bukan 200/500"
+    assert PLAINTEXT not in r.data
+
+
+def test_menolak_path_traversal(app, client, login):
+    tiket_id = _tiket_warga_a(app)
+    login("warga_a")
+
+    with app.app_context():
+        user = User.query.filter_by(username="warga_a").one()
+        jahat = Document(
+            ticket_id=tiket_id,
+            uploaded_by_user_id=user.id,
+            original_filename="palsu.pdf",
+            ciphertext_path="../../../../etc/passwd",
+            algorithm="AES-GCM",
+            crypto_metadata_json="{}",
         )
+        db.session.add(jahat)
+        db.session.commit()
+        jahat_id = jahat.id
 
-    assert list(tmp_path.iterdir()) == []
+    r = client.get(f"/documents/{jahat_id}/download")
+    assert r.status_code in (400, 403), "path traversal harus 400/403, bukan 404 (ambigu)"
+    assert b"root:" not in r.data
