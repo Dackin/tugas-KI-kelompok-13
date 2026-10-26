@@ -5,9 +5,9 @@ Starter workspace untuk aplikasi layanan administrasi RT dengan autentikasi, pem
 Python 3.11+, Flask, Flask-SQLAlchemy, Flask-Login, python-dotenv, cryptography, pytest.
 
 ## Pembagian
-1. **Rayyan Binar Ramadhan 50542510__ — Database & autentikasi:** `app/models.py`, `app/auth/routes.py`, `tests/test_auth.py`
-2. **Rasya Gonawi 50542510__ — Kriptografi & penyimpanan:** `app/crypto/`, `tests/test_crypto.py`
-3. **Raihan Nurhakim 50542510__ — Layanan RT & UI:** `app/tickets/`, `app/resident/`, `app/admin/`, `app/templates/`, `app/static/`
+1. **Rayyan Binar Ramadhan 5054251025 — Database & autentikasi:** `app/models.py`, `app/auth/routes.py`, `tests/test_auth.py`
+2. **Rasya Gonawi 5054251032 — Kriptografi & penyimpanan:** `app/crypto/`, `tests/test_crypto.py`
+3. **Raihan Nurhakim 5054251030 — Layanan RT & UI:** `app/tickets/`, `app/resident/`, `app/admin/`, `app/templates/`, `app/static/`
 4. **Firdaus Mangkona 5054251003 — Integrasi, benchmark & pengujian:** `benchmarks/`, `tests/test_authorization.py`, `tests/test_storage.py`, dokumentasi hasil eksperimen.
 
 ## Fitur target

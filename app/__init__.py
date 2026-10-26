@@ -15,6 +15,7 @@ def create_app(test_config=None):
         SECRET_KEY=os.getenv("SECRET_KEY", "development-only-change-me"),
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///secure_rt_dev.sqlite3"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        CRYPTO_MASTER_KEY_B64=os.getenv("CRYPTO_MASTER_KEY_B64"),
         PRIVATE_STORAGE_DIR=os.getenv("PRIVATE_STORAGE_DIR", "private_storage"),
         MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH_MB", "50")) * 1024 * 1024,
     )
