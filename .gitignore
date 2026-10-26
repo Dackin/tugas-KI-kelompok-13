@@ -1,0 +1,16 @@
+# Python test/build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local secrets and configuration
+.env
+.env.*
+!.env.example
+
+# Runtime data (keep directory placeholders)
+private_storage/*
+!private_storage/.gitkeep
+benchmarks/results/*
+!benchmarks/results/.gitkeep
