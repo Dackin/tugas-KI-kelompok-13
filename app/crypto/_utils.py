@@ -68,3 +68,19 @@ def authenticated_data(
             aad,
         )
     )
+
+
+def authenticated_ciphertext(
+    domain: bytes,
+    metadata_without_tag: dict[str, Any],
+    aad: bytes,
+    ciphertext: bytes,
+) -> bytes:
+    require_bytes(ciphertext, "ciphertext")
+    return b"".join(
+        (
+            authenticated_data(domain, metadata_without_tag, aad),
+            struct.pack(">Q", len(ciphertext)),
+            ciphertext,
+        )
+    )
