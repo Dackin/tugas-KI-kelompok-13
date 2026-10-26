@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if mode == "register" %}Daftar Akun{% else %}Masuk{% endif %} — Secure RT
+{% endblock %}
+
+{% macro render_field(field, autocomplete) %}
+  <div class="mb-3">
+    {{ field.label(class_="form-label") }}
+    {{ field(
+      class_="form-control" ~ (" is-invalid" if field.errors else ""),
+      autocomplete=autocomplete
+    ) }}
+    {% for error in field.errors %}
+      <div class="invalid-feedback">{{ error }}</div>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-9 col-lg-6">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category if category in ['success', 'danger', 'warning', 'info'] else 'info' }}" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if form.csrf_token is defined and form.csrf_token.errors %}
+      <div class="alert alert-danger" role="alert">
+        Sesi formulir tidak valid. Muat ulang halaman lalu coba lagi.
+      </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-1">
+          {% if mode == "register" %}Daftar Akun{% else %}Masuk ke Secure RT{% endif %}
+        </h1>
+        <p class="text-muted small mb-4">
+          {% if mode == "register" %}
+            Buat akun warga untuk mengajukan layanan dan mengunggah dokumen.
+          {% else %}
+            Gunakan akun warga atau admin yang sudah terdaftar.
+          {% endif %}
+        </p>
+
+        {% if mode == "register" %}
+          <form method="post" action="{{ url_for('auth.register') }}">
+            {{ form.hidden_tag() }}
+
+            {{ render_field(form.username, "username") }}
+            {{ render_field(form.full_name, "name") }}
+            {{ render_field(form.address, "street-address") }}
+            {{ render_field(form.password, "new-password") }}
+            <p class="form-text mt-n2">
+              Password minimal 8 karakter dan harus mengandung huruf serta angka.
+            </p>
+            {{ render_field(form.confirm_password, "new-password") }}
+
+            {% if admin_registration_enabled %}
+              {{ render_field(form.admin_code, "off") }}
+              <p class="form-text mt-n2">
+                Isi hanya jika kamu memiliki kode undangan admin.
+              </p>
+            {% endif %}
+
+            {{ form.submit(class_="btn btn-primary w-100") }}
+          </form>
+
+          <p class="text-center small mt-4 mb-0">
+            Sudah punya akun?
+            <a href="{{ url_for('auth.login') }}">Masuk di sini</a>.
+          </p>
+        {% else %}
+          <form
+            method="post"
+            action="{{ url_for('auth.login', next=next_url) if next_url else url_for('auth.login') }}"
+          >
+            {{ form.hidden_tag() }}
+
+            {{ render_field(form.username, "username") }}
+            {{ render_field(form.password, "current-password") }}
+
+            <div class="form-check mb-3">
+              {{ form.remember_me(class_="form-check-input") }}
+              {{ form.remember_me.label(class_="form-check-label") }}
+            </div>
+
+            {{ form.submit(class_="btn btn-primary w-100") }}
+          </form>
+
+          <p class="text-center small mt-4 mb-0">
+            Belum punya akun?
+            <a href="{{ url_for('auth.register') }}">Daftar sebagai warga</a>.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
