@@ -1,0 +1,410 @@
+
+{% extends "base.html" %}
+
+{% block title %}Detail Tiket #{{ ticket.id }} - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-lg-4 py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xxl-10">
+
+            <!-- Header -->
+            <div class="d-flex flex-column flex-md-row
+                        justify-content-between align-items-md-center
+                        gap-3 mb-4">
+                <div>
+                    <a href="{{ url_for('admin.dashboard') }}"
+                       class="text-decoration-none small">
+                        &larr; Kembali ke dashboard
+                    </a>
+
+                    <h1 class="h3 fw-bold mt-3 mb-1">
+                        Detail Pengajuan
+                    </h1>
+
+                    <p class="text-secondary mb-0">
+                        Nomor tiket:
+                        <span class="fw-semibold">#{{ ticket.id }}</span>
+                    </p>
+                </div>
+
+                <div>
+                    {% if ticket.status == 'Diajukan' %}
+                        <span class="badge text-bg-primary fs-6">
+                            Diajukan
+                        </span>
+                    {% elif ticket.status == 'Diproses' %}
+                        <span class="badge text-bg-info fs-6">
+                            Diproses
+                        </span>
+                    {% elif ticket.status == 'Perlu Revisi' %}
+                        <span class="badge text-bg-warning fs-6">
+                            Perlu Revisi
+                        </span>
+                    {% elif ticket.status == 'Selesai' %}
+                        <span class="badge text-bg-success fs-6">
+                            Selesai
+                        </span>
+                    {% elif ticket.status == 'Ditolak' %}
+                        <span class="badge text-bg-danger fs-6">
+                            Ditolak
+                        </span>
+                    {% else %}
+                        <span class="badge text-bg-secondary fs-6">
+                            {{ ticket.status }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-4" aria-live="polite">
+                        {% for category, message in messages %}
+                            {% set alert_type = {
+                                'error': 'danger',
+                                'danger': 'danger',
+                                'success': 'success',
+                                'warning': 'warning',
+                                'info': 'info'
+                            }.get(category, 'info') %}
+
+                            <div class="alert alert-{{ alert_type }} alert-dismissible fade show"
+                                 role="alert">
+                                {{ message }}
+                                <button type="button"
+                                        class="btn-close"
+                                        data-bs-dismiss="alert"
+                                        aria-label="Tutup">
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="row g-4">
+
+                <!-- Kolom informasi pengajuan -->
+                <div class="col-12 col-xl-7">
+
+                    <section class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3">
+                            <h2 class="h5 fw-bold mb-0">
+                                Informasi Pengajuan
+                            </h2>
+                        </div>
+
+                        <div class="card-body p-4">
+                            <div class="row g-4">
+
+                                <div class="col-12 col-md-6">
+                                    <div class="small text-secondary mb-1">
+                                        Nomor Tiket
+                                    </div>
+                                    <div class="fw-semibold">
+                                        #{{ ticket.id }}
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-6">
+                                    <div class="small text-secondary mb-1">
+                                        Tanggal Pengajuan
+                                    </div>
+                                    <div class="fw-semibold">
+                                        {% if ticket.created_at %}
+                                            {{ ticket.created_at.strftime('%d-%m-%Y %H:%M') }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-6">
+                                    <div class="small text-secondary mb-1">
+                                        Nama Pemohon
+                                    </div>
+                                    <div class="fw-semibold text-break">
+                                        {{ applicant_name }}
+                                    </div>
+                                </div>
+
+                                <div class="col-12 col-md-6">
+                                    <div class="small text-secondary mb-1">
+                                        Jenis Layanan
+                                    </div>
+                                    <div class="fw-semibold">
+                                        {{ ticket.service_type }}
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="small text-secondary mb-1">
+                                        Status Saat Ini
+                                    </div>
+
+                                    <div class="fw-semibold">
+                                        {{ ticket.status }}
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-0">
+                                    <div class="small text-secondary mb-2">
+                                        Deskripsi Keperluan
+                                    </div>
+
+                                    <div class="text-break"
+                                         style="white-space: pre-wrap;">{{ ticket.description }}</div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Catatan pengajuan -->
+                    <section class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3">
+                            <h2 class="h5 fw-bold mb-0">
+                                Catatan Pengajuan
+                            </h2>
+                        </div>
+
+                        <div class="card-body p-4">
+                            {% if submission_note %}
+                                <div class="text-break"
+                                     style="white-space: pre-wrap;">{{ submission_note }}</div>
+                            {% else %}
+                                <p class="text-secondary mb-0">
+                                    Tidak ada catatan tambahan pada pengajuan ini.
+                                </p>
+                            {% endif %}
+                        </div>
+                    </section>
+
+                    <!-- Lampiran -->
+                    <section class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3">
+                            <div class="d-flex justify-content-between
+                                        align-items-center gap-2">
+                                <h2 class="h5 fw-bold mb-0">
+                                    Dokumen Pendukung
+                                </h2>
+
+                                <span class="badge text-bg-light border">
+                                    {{ attachments|length }} lampiran
+                                </span>
+                            </div>
+                        </div>
+
+                        {% if attachments %}
+                            <ul class="list-group list-group-flush">
+                                {% for attachment in attachments %}
+                                    <li class="list-group-item p-3">
+                                        <div class="d-flex flex-column
+                                                    flex-sm-row
+                                                    justify-content-between
+                                                    align-items-sm-center
+                                                    gap-3">
+                                            <div class="min-w-0">
+                                                <div class="fw-semibold text-break">
+                                                    {{ attachment.original_filename }}
+                                                </div>
+
+                                                <div class="small text-secondary">
+                                                    Dokumen pendukung
+                                                </div>
+                                            </div>
+
+                                            <a href="{{ url_for(
+                                                    'admin.download_attachment',
+                                                    ticket_id=ticket.id,
+                                                    document_id=attachment.id
+                                                ) }}"
+                                               class="btn btn-sm btn-outline-primary flex-shrink-0">
+                                                Unduh Dokumen
+                                            </a>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="card-body text-center py-4">
+                                <p class="fw-semibold mb-1">
+                                    Tidak Ada Lampiran
+                                </p>
+                                <p class="text-secondary small mb-0">
+                                    Tidak ada dokumen pendukung yang tersedia.
+                                </p>
+                            </div>
+                        {% endif %}
+                    </section>
+
+                </div>
+
+                <!-- Kolom tindakan admin -->
+                <div class="col-12 col-xl-5">
+
+                    <!-- Form perubahan status -->
+                    <section class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3">
+                            <h2 class="h5 fw-bold mb-0">
+                                Perbarui Status
+                            </h2>
+                        </div>
+
+                        <div class="card-body p-4">
+                            <p class="text-secondary small">
+                                Status hanya dapat diubah melalui pengiriman
+                                formulir POST dan akan divalidasi oleh server.
+                            </p>
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'admin.update_ticket_status',
+                                      ticket_id=ticket.id
+                                  ) }}">
+
+                                {% if csrf_token is defined %}
+                                    <input type="hidden"
+                                           name="csrf_token"
+                                           value="{{ csrf_token() }}">
+                                {% endif %}
+
+                                <div class="mb-3">
+                                    <label for="status"
+                                           class="form-label fw-semibold">
+                                        Status Baru
+                                    </label>
+
+                                    <select name="status"
+                                            id="status"
+                                            class="form-select"
+                                            required>
+                                        <option value="">
+                                            Pilih status baru
+                                        </option>
+
+                                        {% for status in allowed_statuses %}
+                                            <option value="{{ status }}"
+                                                {% if status == ticket.status %}selected{% endif %}>
+                                                {{ status }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+
+                                    <div class="form-text">
+                                        Pilihan status yang tersedia mengikuti
+                                        alur proses pengajuan.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="status_note"
+                                           class="form-label fw-semibold">
+                                        Catatan Perubahan
+                                    </label>
+
+                                    <textarea name="note"
+                                              id="status_note"
+                                              class="form-control"
+                                              rows="4"
+                                              maxlength="2000"
+                                              placeholder="Jelaskan alasan perubahan status atau tindak lanjut..."></textarea>
+
+                                    <div class="form-text">
+                                        Catatan ini dikirim bersama perubahan
+                                        status untuk dicatat oleh backend.
+                                    </div>
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-primary w-100">
+                                    Simpan Perubahan Status
+                                </button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <!-- Form catatan admin / permintaan revisi -->
+                    <section class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white py-3">
+                            <h2 class="h5 fw-bold mb-0">
+                                Catatan Admin / Permintaan Revisi
+                            </h2>
+                        </div>
+
+                        <div class="card-body p-4">
+                            <p class="text-secondary small">
+                                Gunakan formulir ini untuk menuliskan arahan
+                                atau dokumen yang perlu diperbaiki pemohon.
+                            </p>
+
+                            <form method="POST"
+                                  action="{{ url_for(
+                                      'admin.update_ticket_status',
+                                      ticket_id=ticket.id
+                                  ) }}">
+
+                                {% if csrf_token is defined %}
+                                    <input type="hidden"
+                                           name="csrf_token"
+                                           value="{{ csrf_token() }}">
+                                {% endif %}
+
+                                <input type="hidden"
+                                       name="action"
+                                       value="save_note">
+
+                                <div class="mb-3">
+                                    <label for="admin_note"
+                                           class="form-label fw-semibold">
+                                        Catatan untuk Pemohon
+                                    </label>
+
+                                    <textarea name="admin_note"
+                                              id="admin_note"
+                                              class="form-control"
+                                              rows="5"
+                                              maxlength="2000"
+                                              placeholder="Tuliskan catatan yang boleh dilihat pemohon..."
+                                              required></textarea>
+
+                                    <div class="form-text">
+                                        Hindari memasukkan NIK, kata sandi,
+                                        atau informasi sensitif yang tidak
+                                        diperlukan.
+                                    </div>
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-outline-primary w-100">
+                                    Simpan Catatan
+                                </button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <div class="alert alert-light border small">
+                        <strong>Pengingat keamanan:</strong>
+                        perubahan status, penyimpanan catatan, dan unduhan
+                        dokumen wajib diperiksa kembali oleh backend.
+                        Tombol dan formulir di halaman ini bukan pengganti
+                        pemeriksaan otorisasi.
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end mt-2">
+                <a href="{{ url_for('admin.dashboard') }}"
+                   class="btn btn-outline-secondary">
+                    Kembali ke Dashboard
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

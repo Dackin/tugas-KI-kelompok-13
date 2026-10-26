@@ -1,0 +1,388 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard Admin - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-lg-4 py-4 py-lg-5">
+
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row
+                justify-content-between align-items-md-center
+                gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1">Dashboard Pengurus RT</h1>
+            <p class="text-secondary mb-0">
+                Pantau antrean dan status pengajuan administrasi warga.
+            </p>
+        </div>
+
+        <div class="small text-secondary">
+            Total pengajuan:
+            <span class="fw-semibold text-dark">
+                {{ total_tickets|default(0) }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4" aria-live="polite">
+                {% for category, message in messages %}
+                    {% set alert_type = {
+                        'error': 'danger',
+                        'danger': 'danger',
+                        'success': 'success',
+                        'warning': 'warning',
+                        'info': 'info'
+                    }.get(category, 'info') %}
+
+                    <div class="alert alert-{{ alert_type }} alert-dismissible fade show"
+                         role="alert">
+                        {{ message }}
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="alert"
+                                aria-label="Tutup">
+                        </button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Ringkasan status -->
+    <section class="mb-5" aria-labelledby="summary-heading">
+        <h2 id="summary-heading" class="h5 fw-bold mb-3">
+            Ringkasan Pengajuan
+        </h2>
+
+        <div class="row g-3">
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Total Pengajuan
+                        </div>
+                        <div class="display-6 fw-bold">
+                            {{ total_tickets|default(0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Semua status
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Diajukan
+                        </div>
+                        <div class="display-6 fw-bold text-primary">
+                            {{ status_counts.get('Diajukan', 0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Menunggu penanganan
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Diproses
+                        </div>
+                        <div class="display-6 fw-bold text-info">
+                            {{ status_counts.get('Diproses', 0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Sedang ditangani
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Perlu Revisi
+                        </div>
+                        <div class="display-6 fw-bold text-warning">
+                            {{ status_counts.get('Perlu Revisi', 0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Membutuhkan perbaikan
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Selesai
+                        </div>
+                        <div class="display-6 fw-bold text-success">
+                            {{ status_counts.get('Selesai', 0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Telah diselesaikan
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-xl">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-2">
+                            Ditolak
+                        </div>
+                        <div class="display-6 fw-bold text-danger">
+                            {{ status_counts.get('Ditolak', 0) }}
+                        </div>
+                        <div class="small text-secondary mt-1">
+                            Tidak disetujui
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Antrean tiket -->
+    <section aria-labelledby="queue-heading">
+        <div class="d-flex flex-column flex-md-row
+                    justify-content-between align-items-md-center
+                    gap-2 mb-3">
+            <div>
+                <h2 id="queue-heading" class="h5 fw-bold mb-1">
+                    Antrean Pengajuan
+                </h2>
+                <p class="text-secondary small mb-0">
+                    Daftar pengajuan untuk diperiksa dan ditindaklanjuti.
+                </p>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <form method="GET"
+                      action="{{ url_for('admin.dashboard') }}"
+                      class="row g-3 align-items-end">
+
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label for="status" class="form-label fw-semibold">
+                            Status
+                        </label>
+                        <select id="status"
+                                name="status"
+                                class="form-select">
+                            <option value=""
+                                {% if not selected_status %}selected{% endif %}>
+                                Semua Status
+                            </option>
+                            {% for status in status_options %}
+                                <option value="{{ status }}"
+                                    {% if selected_status == status %}selected{% endif %}>
+                                    {{ status }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label for="service_type"
+                               class="form-label fw-semibold">
+                            Jenis Layanan
+                        </label>
+                        <select id="service_type"
+                                name="service_type"
+                                class="form-select">
+                            <option value=""
+                                {% if not selected_service_type %}selected{% endif %}>
+                                Semua Layanan
+                            </option>
+                            {% for service in service_options %}
+                                <option value="{{ service }}"
+                                    {% if selected_service_type == service %}selected{% endif %}>
+                                    {{ service }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-auto">
+                        <button type="submit"
+                                class="btn btn-primary">
+                            Terapkan Filter
+                        </button>
+                        <a href="{{ url_for('admin.dashboard') }}"
+                           class="btn btn-outline-secondary">
+                            Reset
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Tabel antrean -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <div class="d-flex justify-content-between
+                            align-items-center gap-2">
+                    <h3 class="h6 fw-bold mb-0">
+                        Daftar Tiket
+                    </h3>
+                    <span class="badge text-bg-light border">
+                        {{ tickets|length }} tiket ditampilkan
+                    </span>
+                </div>
+            </div>
+
+            {% if tickets %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col" class="ps-3">Nomor Tiket</th>
+                                <th scope="col">Nama Pemohon</th>
+                                <th scope="col">Jenis Layanan</th>
+                                <th scope="col">Tanggal Pengajuan</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="text-center pe-3">
+                                    Aksi
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for ticket in tickets %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <span class="fw-semibold">
+                                            #{{ ticket.id }}
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        {{ ticket.applicant_name }}
+                                    </td>
+
+                                    <td>
+                                        {{ ticket.service_type }}
+                                    </td>
+
+                                    <td>
+                                        {% if ticket.created_at %}
+                                            {{ ticket.created_at.strftime('%d-%m-%Y %H:%M') }}
+                                        {% else %}
+                                            <span class="text-secondary">-</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if ticket.status == 'Diajukan' %}
+                                            <span class="badge text-bg-primary">
+                                                Diajukan
+                                            </span>
+                                        {% elif ticket.status == 'Diproses' %}
+                                            <span class="badge text-bg-info">
+                                                Diproses
+                                            </span>
+                                        {% elif ticket.status == 'Perlu Revisi' %}
+                                            <span class="badge text-bg-warning">
+                                                Perlu Revisi
+                                            </span>
+                                        {% elif ticket.status == 'Selesai' %}
+                                            <span class="badge text-bg-success">
+                                                Selesai
+                                            </span>
+                                        {% elif ticket.status == 'Ditolak' %}
+                                            <span class="badge text-bg-danger">
+                                                Ditolak
+                                            </span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">
+                                                {{ ticket.status }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="text-center pe-3">
+                                        <a href="{{ url_for(
+                                                'admin.ticket_detail',
+                                                ticket_id=ticket.id
+                                            ) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Periksa Detail
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <!-- Empty state -->
+                <div class="card-body text-center py-5 px-3">
+                    <div class="mb-3 text-secondary"
+                         aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             width="56" height="56"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor"
+                             stroke-width="1.5">
+                            <path stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  d="M8 7h8M8 11h8M8 15h5
+                                     M6 3.75h8.5L19 8.25v12
+                                     A.75.75 0 0 1 18.25 21h-12
+                                     A.75.75 0 0 1 5.5 20.25v-15
+                                     A1.5 1.5 0 0 1 7 3.75Z
+                                     M14.5 3.75v4.5H19"/>
+                        </svg>
+                    </div>
+
+                    {% if selected_status or selected_service_type %}
+                        <h3 class="h5 fw-bold">
+                            Tidak Ada Tiket yang Sesuai
+                        </h3>
+                        <p class="text-secondary mb-3">
+                            Tidak ditemukan pengajuan untuk filter yang dipilih.
+                        </p>
+                        <a href="{{ url_for('admin.dashboard') }}"
+                           class="btn btn-outline-secondary">
+                            Hapus Filter
+                        </a>
+                    {% else %}
+                        <h3 class="h5 fw-bold">
+                            Belum Ada Pengajuan
+                        </h3>
+                        <p class="text-secondary mb-0">
+                            Belum ada pengajuan administrasi warga
+                            yang tercatat.
+                        </p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <p class="small text-secondary mt-3 mb-0">
+        Tabel antrean hanya menampilkan informasi yang diperlukan
+        untuk mengelola pengajuan. Dokumen dan data identitas sensitif
+        tidak ditampilkan di halaman ini.
+    </p>
+
+</div>
+{% endblock %}

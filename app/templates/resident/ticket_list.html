@@ -1,0 +1,233 @@
+
+{% extends "base.html" %}
+
+{% block title %}Daftar Pengajuan - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+
+    <!-- Header halaman -->
+    <div class="d-flex flex-column flex-md-row
+                justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1">Daftar Pengajuan</h1>
+            <p class="text-secondary mb-0">
+                Pantau status pengajuan administrasi yang telah Anda buat.
+            </p>
+        </div>
+
+        <a href="{{ url_for('tickets.create_ticket') }}"
+           class="btn btn-primary">
+            <span aria-hidden="true">+</span>
+            Buat Pengajuan
+        </a>
+    </div>
+
+    <!-- Filter status -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET"
+                  action="{{ url_for('resident.ticket_list') }}"
+                  class="row g-3 align-items-end">
+
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label for="status" class="form-label fw-semibold">
+                        Filter Status
+                    </label>
+
+                    <select name="status"
+                            id="status"
+                            class="form-select">
+                        <option value=""
+                            {% if not selected_status %}selected{% endif %}>
+                            Semua Status
+                        </option>
+
+                        <option value="Diajukan"
+                            {% if selected_status == 'Diajukan' %}selected{% endif %}>
+                            Diajukan
+                        </option>
+
+                        <option value="Diproses"
+                            {% if selected_status == 'Diproses' %}selected{% endif %}>
+                            Diproses
+                        </option>
+
+                        <option value="Perlu Revisi"
+                            {% if selected_status == 'Perlu Revisi' %}selected{% endif %}>
+                            Perlu Revisi
+                        </option>
+
+                        <option value="Selesai"
+                            {% if selected_status == 'Selesai' %}selected{% endif %}>
+                            Selesai
+                        </option>
+
+                        <option value="Ditolak"
+                            {% if selected_status == 'Ditolak' %}selected{% endif %}>
+                            Ditolak
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-auto">
+                    <button type="submit" class="btn btn-outline-primary">
+                        Terapkan Filter
+                    </button>
+
+                    <a href="{{ url_for('resident.ticket_list') }}"
+                       class="btn btn-outline-secondary">
+                        Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Daftar tiket -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="h5 fw-bold mb-0">Pengajuan Saya</h2>
+
+                <span class="badge text-bg-light border">
+                    {{ tickets|length }} pengajuan
+                </span>
+            </div>
+        </div>
+
+        {% if tickets %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" class="ps-3">Nomor Tiket</th>
+                            <th scope="col">Jenis Layanan</th>
+                            <th scope="col">Tanggal Pengajuan</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="text-center pe-3">
+                                Aksi
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for ticket in tickets %}
+                            <tr>
+                                <td class="ps-3">
+                                    <span class="fw-semibold">
+                                        #{{ ticket.id }}
+                                    </span>
+                                </td>
+
+                                <td>
+                                    {{ ticket.service_type }}
+                                </td>
+
+                                <td>
+                                    {% if ticket.created_at %}
+                                        {{ ticket.created_at.strftime('%d-%m-%Y') }}
+                                    {% else %}
+                                        <span class="text-secondary">-</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if ticket.status == 'Diajukan' %}
+                                        <span class="badge text-bg-primary">
+                                            Diajukan
+                                        </span>
+                                    {% elif ticket.status == 'Diproses' %}
+                                        <span class="badge text-bg-info">
+                                            Diproses
+                                        </span>
+                                    {% elif ticket.status == 'Perlu Revisi' %}
+                                        <span class="badge text-bg-warning">
+                                            Perlu Revisi
+                                        </span>
+                                    {% elif ticket.status == 'Selesai' %}
+                                        <span class="badge text-bg-success">
+                                            Selesai
+                                        </span>
+                                    {% elif ticket.status == 'Ditolak' %}
+                                        <span class="badge text-bg-danger">
+                                            Ditolak
+                                        </span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">
+                                            {{ ticket.status }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+
+                                <td class="text-center pe-3">
+                                    <a href="{{ url_for(
+                                            'tickets.ticket_detail',
+                                            ticket_id=ticket.id
+                                        ) }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        Lihat Detail
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <!-- Empty state -->
+            <div class="card-body text-center py-5 px-3">
+                <div class="mb-3" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         width="56" height="56"
+                         fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         stroke-width="1.5"
+                         class="text-secondary">
+                        <path stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M8 7h8M8 11h8M8 15h5
+                                 M6 3.75h8.5L19 8.25v12
+                                 A.75.75 0 0 1 18.25 21h-12
+                                 A.75.75 0 0 1 5.5 20.25v-15
+                                 A1.5 1.5 0 0 1 7 3.75Z
+                                 M14.5 3.75v4.5H19"/>
+                    </svg>
+                </div>
+
+                {% if selected_status %}
+                    <h3 class="h5 fw-bold">Tidak Ada Pengajuan</h3>
+                    <p class="text-secondary mb-4">
+                        Belum ada pengajuan dengan status
+                        <strong>{{ selected_status }}</strong>.
+                    </p>
+
+                    <a href="{{ url_for('resident.ticket_list') }}"
+                       class="btn btn-outline-secondary me-2">
+                        Lihat Semua Pengajuan
+                    </a>
+                {% else %}
+                    <h3 class="h5 fw-bold">Belum Ada Pengajuan</h3>
+                    <p class="text-secondary mb-4">
+                        Anda belum membuat pengajuan administrasi.
+                        Buat pengajuan pertama untuk memulai.
+                    </p>
+                {% endif %}
+
+                <a href="{{ url_for('tickets.create_ticket') }}"
+                   class="btn btn-primary">
+                    Buat Pengajuan
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <p class="small text-secondary mt-3 mb-0">
+        Informasi pada tabel hanya menampilkan ringkasan pengajuan.
+        Dokumen dan informasi pendukung dapat dilihat melalui halaman detail
+        setelah akses diverifikasi oleh server.
+    </p>
+
+</div>
+{% endblock %}

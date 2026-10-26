@@ -1,0 +1,304 @@
+
+{% extends "base.html" %}
+
+{% block title %}Detail Pengajuan #{{ ticket.id }} - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+
+            <!-- Header -->
+            <div class="d-flex flex-column flex-md-row
+                        justify-content-between align-items-md-center
+                        gap-3 mb-4">
+                <div>
+                    <a href="{{ url_for('resident.ticket_list') }}"
+                       class="text-decoration-none small">
+                        &larr; Kembali ke daftar pengajuan
+                    </a>
+
+                    <h1 class="h3 fw-bold mt-3 mb-1">
+                        Detail Pengajuan
+                    </h1>
+                    <p class="text-secondary mb-0">
+                        Nomor tiket:
+                        <span class="fw-semibold">#{{ ticket.id }}</span>
+                    </p>
+                </div>
+
+                <div>
+                    {% if ticket.status == 'Diajukan' %}
+                        <span class="badge text-bg-primary fs-6">
+                            Diajukan
+                        </span>
+                    {% elif ticket.status == 'Diproses' %}
+                        <span class="badge text-bg-info fs-6">
+                            Diproses
+                        </span>
+                    {% elif ticket.status == 'Perlu Revisi' %}
+                        <span class="badge text-bg-warning fs-6">
+                            Perlu Revisi
+                        </span>
+                    {% elif ticket.status == 'Selesai' %}
+                        <span class="badge text-bg-success fs-6">
+                            Selesai
+                        </span>
+                    {% elif ticket.status == 'Ditolak' %}
+                        <span class="badge text-bg-danger fs-6">
+                            Ditolak
+                        </span>
+                    {% else %}
+                        <span class="badge text-bg-secondary fs-6">
+                            {{ ticket.status }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ringkasan pengajuan -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 fw-bold mb-0">
+                        Informasi Pengajuan
+                    </h2>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-12 col-md-6">
+                            <div class="text-secondary small mb-1">
+                                Nomor Tiket
+                            </div>
+                            <div class="fw-semibold">
+                                #{{ ticket.id }}
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="text-secondary small mb-1">
+                                Jenis Layanan
+                            </div>
+                            <div class="fw-semibold">
+                                {{ ticket.service_type }}
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="text-secondary small mb-1">
+                                Tanggal Pengajuan
+                            </div>
+                            <div class="fw-semibold">
+                                {% if ticket.created_at %}
+                                    {{ ticket.created_at.strftime('%d-%m-%Y %H:%M') }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="text-secondary small mb-1">
+                                Status Terbaru
+                            </div>
+
+                            <div class="fw-semibold">
+                                {{ ticket.status }}
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <hr class="my-0">
+                            <div class="text-secondary small mb-2">
+                                Deskripsi Keperluan
+                            </div>
+
+                            <div class="text-break"
+                                 style="white-space: pre-wrap;">{{ ticket.description }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Catatan admin / permintaan revisi -->
+            {% if admin_note %}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h2 class="h5 fw-bold mb-0">
+                            Catatan dari Admin
+                        </h2>
+                    </div>
+
+                    <div class="card-body p-4">
+                        {% if ticket.status == 'Perlu Revisi' %}
+                            <div class="alert alert-warning mb-3">
+                                <strong>Perlu tindakan:</strong>
+                                Silakan periksa catatan berikut dan unggah
+                                dokumen perbaikan jika diperlukan.
+                            </div>
+                        {% endif %}
+
+                        <p class="mb-0 text-break"
+                           style="white-space: pre-wrap;">{{ admin_note }}</p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Daftar lampiran -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex justify-content-between
+                                align-items-center gap-2">
+                        <h2 class="h5 fw-bold mb-0">
+                            Dokumen Pendukung
+                        </h2>
+
+                        <span class="badge text-bg-light border">
+                            {{ attachments|length }} lampiran
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    {% if attachments %}
+                        <ul class="list-group list-group-flush">
+                            {% for attachment in attachments %}
+                                <li class="list-group-item p-3 p-md-4">
+                                    <div class="d-flex flex-column
+                                                flex-sm-row
+                                                justify-content-between
+                                                align-items-sm-center
+                                                gap-3">
+                                        <div class="d-flex align-items-start
+                                                    gap-3">
+                                            <div class="rounded bg-light
+                                                        p-3 text-secondary"
+                                                 aria-hidden="true">
+                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                     width="24" height="24"
+                                                     fill="none"
+                                                     viewBox="0 0 24 24"
+                                                     stroke="currentColor"
+                                                     stroke-width="1.5">
+                                                    <path stroke-linecap="round"
+                                                          stroke-linejoin="round"
+                                                          d="M14 2.75H6.75
+                                                             A1.75 1.75 0 0 0 5 4.5v15
+                                                             A1.75 1.75 0 0 0 6.75 21.25h10.5
+                                                             A1.75 1.75 0 0 0 19 19.5V7.75Z
+                                                             M14 2.75v5h5
+                                                             M8 13h8M8 16.5h8"/>
+                                                </svg>
+                                            </div>
+
+                                            <div class="min-w-0">
+                                                <div class="fw-semibold text-break">
+                                                    {{ attachment.original_filename }}
+                                                </div>
+                                                <div class="small text-secondary">
+                                                    Dokumen pendukung
+                                                    {% if attachment.size_bytes is defined
+                                                          and attachment.size_bytes %}
+                                                        &middot;
+                                                        {{ "%.2f"|format(attachment.size_bytes / 1048576) }}
+                                                        MiB
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex-shrink-0">
+                                            <a href="{{ url_for(
+                                                    'tickets.download_attachment',
+                                                    ticket_id=ticket.id,
+                                                    document_id=attachment.id
+                                                ) }}"
+                                               class="btn btn-outline-primary btn-sm">
+                                                Unduh Dokumen
+                                            </a>
+                                        </div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="text-center py-5 px-3">
+                            <p class="fw-semibold mb-1">
+                                Belum ada lampiran
+                            </p>
+                            <p class="text-secondary small mb-0">
+                                Pengajuan ini tidak memiliki dokumen
+                                pendukung yang tersedia.
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Unggah ulang ketika perlu revisi -->
+            {% if ticket.status == 'Perlu Revisi' and allow_reupload|default(false) %}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white py-3">
+                        <h2 class="h5 fw-bold mb-0">
+                            Unggah Ulang Dokumen
+                        </h2>
+                    </div>
+
+                    <div class="card-body p-4">
+                        <p class="text-secondary">
+                            Unggah dokumen perbaikan sesuai catatan admin.
+                            File akan divalidasi oleh server sebelum diproses.
+                        </p>
+
+                        <form method="POST"
+                              action="{{ url_for(
+                                  'tickets.upload_attachment',
+                                  ticket_id=ticket.id
+                              ) }}"
+                              enctype="multipart/form-data">
+
+                            {% if csrf_token is defined %}
+                                <input type="hidden"
+                                       name="csrf_token"
+                                       value="{{ csrf_token() }}">
+                            {% endif %}
+
+                            <div class="mb-3">
+                                <label for="attachment"
+                                       class="form-label fw-semibold">
+                                    Pilih Dokumen
+                                </label>
+
+                                <input type="file"
+                                       name="attachment"
+                                       id="attachment"
+                                       class="form-control"
+                                       accept=".pdf,.png,.jpg,.jpeg"
+                                       required>
+
+                                <div class="form-text">
+                                    Format yang diizinkan: PDF, PNG, JPG,
+                                    JPEG. Ukuran maksimum: 5 MiB per file.
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">
+                                Unggah Dokumen
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Tombol kembali -->
+            <div class="d-flex justify-content-end">
+                <a href="{{ url_for('resident.ticket_list') }}"
+                   class="btn btn-outline-secondary">
+                    Kembali ke Daftar Tiket
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
