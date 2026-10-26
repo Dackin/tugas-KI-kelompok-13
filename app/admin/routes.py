@@ -24,13 +24,13 @@ from app.models import User, Resident, Ticket, Document
 # Model audit bersifat opsional. Tim database perlu menyediakan
 # model ini jika audit log belum tersedia.
 try:
-    from app.models import TicketAuditLog
+    from app.models import AuditLog
 except ImportError:
-    TicketAuditLog = None
+    AuditLog = None
 
 # Kontrak layanan kriptografi: fungsi ini harus benar-benar
 # diimplementasikan dalam app/crypto/storage.py.
-from app.crypto.storage import load_decrypted_file
+from app.crypto.storage import decrypt_file
 
 
 admin_bp = Blueprint(
@@ -132,15 +132,15 @@ def _record_audit(ticket, old_status, new_status, note):
     Jika model audit belum tersedia, keluarkan peringatan agar
     konfigurasi produksi tidak mengklaim audit sudah aktif.
     """
-    if TicketAuditLog is None:
+    if AuditLog is None:
         current_app.logger.warning(
-            "TicketAuditLog belum tersedia; perubahan tiket "
+            "AuditLog belum tersedia; perubahan tiket "
             "tidak memiliki audit log permanen. ticket_id=%s",
             ticket.id,
         )
         return
 
-    audit = TicketAuditLog(
+    audit = AuditLog(
         ticket_id=ticket.id,
         admin_user_id=current_user.id,
         old_status=old_status,
@@ -206,11 +206,11 @@ def ticket_detail(ticket_id):
 
     audit_logs = []
 
-    if TicketAuditLog is not None:
+    if AuditLog is not None:
         audit_logs = (
-            TicketAuditLog.query
+            AuditLog.query
             .filter_by(ticket_id=ticket.id)
-            .order_by(TicketAuditLog.created_at.desc())
+            .order_by(AuditLog.created_at.desc())
             .limit(50)
             .all()
         )
@@ -317,7 +317,7 @@ def download_attachment(ticket_id, document_id):
 
     try:
         # storage_key berasal dari database tepercaya, bukan request.
-        plaintext = load_decrypted_file(document.storage_key)
+        plaintext = decrypt_file(document.storage_key)
 
     except Exception:
         logger.exception(
