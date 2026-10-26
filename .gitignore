@@ -4,14 +4,31 @@ __pycache__/
 .pytest_cache/
 .pytest-tmp/
 .venv/
+.coverage
+htmlcov/
 
 # Local secrets and configuration
 .env
 .env.*
 !.env.example
+*.key
+*.pem
+
+# Local database and SQLite sidecar files
+instance/*
+!instance/.gitkeep
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
 
 # Runtime data (keep directory placeholders)
 private_storage/*
 !private_storage/.gitkeep
 benchmarks/results/*
 !benchmarks/results/.gitkeep
+
+# Local logs and editor settings
+*.log
+.idea/
+.vscode/
