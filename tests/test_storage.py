@@ -1,7 +1,7 @@
 """Anggota 4: uji penyimpanan privat dan download melalui route terproteksi.
 
 Kontrak yang diuji (lihat docs/PEMBAGIAN_TUGAS.md):
-- upload  : POST /tickets/<id>/dokumen, multipart field `file`, `algorithm` opsional
+- upload  : POST /tickets/<id>/dokumen, multipart field `document`
 - download: GET /documents/<id>/download
 - `Document.ciphertext_path` relatif terhadap PRIVATE_STORAGE_DIR
 - route download memeriksa login + kepemilikan SEBELUM membaca file
@@ -11,6 +11,7 @@ selesai. Itu wajar: tes ini adalah spesifikasi.
 """
 
 import io
+import stat
 from pathlib import Path
 
 from app import db
@@ -34,10 +35,10 @@ def _tiket_warga_a(app) -> int:
         return tiket.id
 
 
-def _unggah(client, tiket_id, isi=PLAINTEXT, nama=NAMA_ASLI, algoritma="AES-GCM"):
+def _unggah(client, tiket_id, isi=PLAINTEXT, nama=NAMA_ASLI):
     return client.post(
         f"/tickets/{tiket_id}/dokumen",
-        data={"file": (io.BytesIO(isi), nama), "algorithm": algoritma},
+        data={"document": (io.BytesIO(isi), nama)},
         content_type="multipart/form-data",
     )
 
@@ -122,6 +123,23 @@ def test_ciphertext_rusak_tidak_menghasilkan_plaintext(app, client, login):
     assert PLAINTEXT not in r.data
 
 
+def test_file_ciphertext_hanya_dapat_dibaca_pemiliknya(tmp_path):
+    from app.crypto.storage import encrypt_file
+
+    stored = encrypt_file(
+        PLAINTEXT,
+        storage_root=tmp_path,
+        key=b"k" * 32,
+        context={
+            "ticket_id": 1,
+            "uploaded_by_user_id": 1,
+            "original_filename": NAMA_ASLI,
+        },
+    )
+    path = tmp_path / stored.ciphertext_path
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
 def test_menolak_path_traversal(app, client, login):
     tiket_id = _tiket_warga_a(app)
     login("warga_a")
@@ -133,7 +151,7 @@ def test_menolak_path_traversal(app, client, login):
             uploaded_by_user_id=user.id,
             original_filename="palsu.pdf",
             ciphertext_path="../../../../etc/passwd",
-            algorithm="AES-GCM",
+            algorithm="AES-256-GCM",
             crypto_metadata_json="{}",
         )
         db.session.add(jahat)

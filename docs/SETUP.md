@@ -28,16 +28,20 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Lalu isi dua nilai wajib di `.env`. Buat token acak dengan:
+Lalu isi dua nilai wajib di `.env`. Keduanya dibuat dengan perintah berbeda:
 
 ```bash
+# SECRET_KEY
 python -c "import secrets; print(secrets.token_hex(32))"
+
+# CRYPTO_MASTER_KEY_B64 (harus Base64 dari tepat 32 byte)
+python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())"
 ```
 
 | Variabel | Isi |
 |---|---|
-| `SECRET_KEY` | hasil perintah di atas (dipakai Flask untuk session) |
-| `CRYPTO_MASTER_KEY` | hasil perintah di atas, jalankan lagi agar berbeda (dipakai `app/crypto/keys.py`) |
+| `SECRET_KEY` | hasil perintah pertama, format hex 64 karakter |
+| `CRYPTO_MASTER_KEY_B64` | hasil perintah kedua, format Base64 (dibaca `app/crypto/keys.py`) |
 | `PRIVATE_STORAGE_DIR` | biarkan `private_storage` |
 | `MAX_CONTENT_LENGTH_MB` | biarkan `50` |
 
@@ -58,11 +62,21 @@ Buka <http://127.0.0.1:5000>.
 
 ## 5. Menjalankan tes
 
+Jalankan dari **root project**, dengan virtual environment aktif:
+
 ```bash
 pytest -q                       # semua tes
 pytest tests/test_auth.py -v    # satu file
 pytest -k "dokumen" -v          # filter nama tes
 ```
+
+`python -m pytest -q` juga boleh. Konfigurasi ada di `pytest.ini`
+(`pythonpath = .`, `testpaths = tests`), jadi `import app` bekerja tanpa
+menyetel `PYTHONPATH`.
+
+**Jangan** menjalankan `python tests/conftest.py` — itu file fixture untuk
+pytest, bukan program; menjalankannya langsung akan gagal dengan
+`ModuleNotFoundError: No module named 'app'`.
 
 Tes memakai database in-memory dan folder penyimpanan sementara
 (`tests/conftest.py`), jadi tidak menyentuh `instance/` maupun
@@ -74,12 +88,13 @@ Setelah `app/crypto/` selesai:
 
 ```bash
 python benchmarks/benchmark.py
-python benchmarks/benchmark.py --algoritma AES-GCM --ukuran 1MB --ulangi 5
+python benchmarks/benchmark.py --algoritma AES-256-GCM --ukuran 1MB --ulangi 5
 ```
 
 Hasil ditulis ke `benchmarks/results/benchmark_<timestamp>.csv` dan `.json`.
-Ukuran 10 MB pada DES/RC4 implementasi Python murni bisa lambat; gunakan
-`--ukuran 1KB,100KB` bila hanya ingin membandingkan kecepatan relatif.
+DES/RC4 memakai `pycryptodome` (bukan Python murni); pada mesin uji 10 MB DES
+memakan ~0,28 detik per operasi. Gunakan `--ukuran 1KB,100KB` untuk percobaan
+cepat.
 Angka di `docs/HASIL_BENCHMARK.md` harus berasal dari file hasil ini, bukan
 perkiraan.
 

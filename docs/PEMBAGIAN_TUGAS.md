@@ -32,35 +32,43 @@ Disepakati sebelum implementasi supaya pekerjaan bisa berjalan paralel.
 | Nama | Dipakai | Keterangan |
 |---|---|---|
 | `SECRET_KEY` | Flask | kunci session |
-| `CRYPTO_MASTER_KEY` | `app/crypto/keys.py` | hex 64 karakter, diturunkan via HKDF |
+| `CRYPTO_MASTER_KEY_B64` | `app/crypto/keys.py` | Base64 dari 32 byte acak |
 | `PRIVATE_STORAGE_DIR` | storage | default `private_storage` |
 | `MAX_CONTENT_LENGTH_MB` | upload | default 50 |
 | `DATABASE_URL` | SQLAlchemy | dikomentari = pakai default `instance/secure_rt_dev.sqlite3` |
 
 ### Signature kripto
 
-Semua modul cipher (`aes.py`, `des.py`, `rc4.py`) wajib punya:
+Semua modul cipher (`aes.py`, `des.py`, `rc4.py`) memakai bentuk seragam:
 
 ```python
-def encrypt(data: bytes) -> tuple[bytes, dict]   # (ciphertext, metadata JSON-serializable)
-def decrypt(blob: bytes, meta: dict) -> bytes    # raise bila integritas gagal
+def encrypt(plaintext: bytes, key: bytes, *, aad: bytes = b"") -> tuple[bytes, dict]
+def decrypt(ciphertext: bytes, key: bytes, metadata: dict, *, aad: bytes = b"") -> bytes
 ```
 
-`app/crypto/__init__.py`:
+Identifier algoritma (nilai kolom `Document.algorithm`):
 
-```python
-ALGORITHMS: dict[str, ModuleType]     # {"AES-GCM": aes, "DES-CBC": des, "RC4": rc4}
-def get_cipher(nama: str) -> ModuleType
-```
+| Modul | `ALGORITHM` |
+|---|---|
+| `aes.py` | `AES-256-GCM` (default aplikasi) |
+| `des.py` | `DES-CBC-HMAC-SHA256` (akademik) |
+| `rc4.py` | `RC4-HMAC-SHA256` (akademik) |
 
 `app/crypto/storage.py`:
 
 ```python
-def store_bytes(data: bytes, algorithm: str) -> StoredFile
-def read_bytes(relative_path: str, metadata: dict) -> bytes
+def encrypt_file(plaintext, *, storage_root, key, context, algorithm="AES-256-GCM") -> StoredFile
+def decrypt_file(*, ciphertext_path, storage_root, key, context, algorithm, metadata) -> bytes
 ```
 
-`StoredFile` berisi `relative_path`, `size_bytes`, `sha256_plaintext`, `algorithm`, `metadata`.
+`context` wajib berisi tepat tiga field dan ikut diautentikasi sebagai AAD:
+
+```python
+{"ticket_id": int, "uploaded_by_user_id": int, "original_filename": str}
+```
+
+`StoredFile` berisi `ciphertext_path`, `algorithm`, `crypto_metadata_json`.
+Detail lengkap: `docs/INTEGRASI_KRIPTOGRAFI.md`.
 
 ### Aturan penyimpanan
 
@@ -81,7 +89,7 @@ def read_bytes(relative_path: str, metadata: dict) -> bytes
 | GET/POST | `/tickets/baru` | warga | `service_type`, `description` |
 | GET | `/tickets/<int:id>` | pemilik atau admin | — |
 | POST | `/tickets/<int:id>/pesan` | pemilik atau admin | `message` |
-| POST | `/tickets/<int:id>/dokumen` | pemilik | multipart `file`, `algorithm` opsional |
+| POST | `/tickets/<int:id>/dokumen` | pemilik | multipart `document` (algoritma tidak dipilih user, selalu `AES-256-GCM`) |
 | GET | `/documents/<int:id>/download` | pemilik atau admin | — |
 | GET | `/admin/tiket` | admin | — |
 | POST | `/admin/tiket/<int:id>/status` | admin | `status` |
@@ -90,7 +98,7 @@ Denial akses: warga → resource warga lain = `403` atau `404`; warga → area a
 anonim → redirect ke `/auth/login`. Pemeriksaan kepemilikan dilakukan **sebelum**
 membaca file.
 
-Pemetaan error: `IntegrityError` (ciphertext rusak) → `400`; `PathTraversalError` → `400`.
+Pemetaan error: `CryptoError` (ciphertext rusak, path traversal, metadata tidak valid) → `400`.
 
 ### Status tiket
 
