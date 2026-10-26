@@ -7,7 +7,7 @@ from hashlib import sha256
 import pytest
 
 from app.crypto import CryptoError
-from app.crypto import aes, des
+from app.crypto import aes, des, rc4
 
 
 TEST_KEY = bytes(range(32))
@@ -163,3 +163,72 @@ def test_des_rejects_wrong_key_and_aad():
         des.decrypt(ciphertext, b"X" * 32, metadata, aad=TEST_AAD)
     with pytest.raises(CryptoError, match="decryption failed"):
         des.decrypt(ciphertext, TEST_KEY, metadata, aad=b"wrong context")
+
+
+@pytest.mark.parametrize(
+    "plaintext",
+    [b"", b"short", bytes(range(256)), b"\x00\xff\xfe\x80non-utf8", b"R" * 4097],
+)
+def test_rc4_round_trip_is_identical(plaintext):
+    ciphertext, metadata = rc4.encrypt(plaintext, TEST_KEY, aad=TEST_AAD)
+
+    decrypted = rc4.decrypt(ciphertext, TEST_KEY, metadata, aad=TEST_AAD)
+
+    assert decrypted == plaintext
+    assert sha256(decrypted).digest() == sha256(plaintext).digest()
+    assert metadata["algorithm"] == "RC4-HMAC-SHA256"
+    assert "mode" not in metadata
+    assert metadata["insecure_academic_only"] is True
+
+
+def test_rc4_uses_unique_session_key_for_same_plaintext():
+    first_ciphertext, first_metadata = rc4.encrypt(b"same", TEST_KEY)
+    second_ciphertext, second_metadata = rc4.encrypt(b"same", TEST_KEY)
+
+    assert first_metadata["salt_b64"] != second_metadata["salt_b64"]
+    assert first_ciphertext != second_ciphertext
+
+
+def test_rc4_rejects_modified_ciphertext():
+    ciphertext, metadata = rc4.encrypt(b"sensitive document", TEST_KEY)
+    tampered = bytes([ciphertext[0] ^ 1]) + ciphertext[1:]
+
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(tampered, TEST_KEY, metadata)
+
+
+def test_rc4_rejects_modified_tag():
+    ciphertext, metadata = rc4.encrypt(b"sensitive document", TEST_KEY)
+    tampered_metadata = deepcopy(metadata)
+    tampered_metadata["tag_b64"] = _flip_first_b64_byte(metadata["tag_b64"])
+
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(ciphertext, TEST_KEY, tampered_metadata)
+
+
+def test_rc4_rejects_modified_salt():
+    ciphertext, metadata = rc4.encrypt(b"sensitive document", TEST_KEY)
+    tampered_metadata = deepcopy(metadata)
+    tampered_metadata["salt_b64"] = _flip_first_b64_byte(metadata["salt_b64"])
+
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(ciphertext, TEST_KEY, tampered_metadata)
+
+
+@pytest.mark.parametrize("field", ["version", "algorithm", "kdf", "mac"])
+def test_rc4_rejects_modified_descriptor_metadata(field):
+    ciphertext, metadata = rc4.encrypt(b"sensitive document", TEST_KEY)
+    tampered_metadata = deepcopy(metadata)
+    tampered_metadata[field] = "changed"
+
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(ciphertext, TEST_KEY, tampered_metadata)
+
+
+def test_rc4_rejects_wrong_key_and_aad():
+    ciphertext, metadata = rc4.encrypt(b"sensitive document", TEST_KEY, aad=TEST_AAD)
+
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(ciphertext, b"X" * 32, metadata, aad=TEST_AAD)
+    with pytest.raises(CryptoError, match="decryption failed"):
+        rc4.decrypt(ciphertext, TEST_KEY, metadata, aad=b"wrong context")
