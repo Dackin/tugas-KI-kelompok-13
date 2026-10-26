@@ -1,0 +1,73 @@
+
+{% extends "base.html" %}
+
+{% block title %}Akses Ditolak - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center align-items-center"
+         style="min-height: 65vh;">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body text-center p-4 p-md-5">
+
+                    <div class="mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center
+                                    bg-danger bg-opacity-10 text-danger rounded-circle"
+                             style="width: 88px; height: 88px;"
+                             aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 width="42"
+                                 height="42"
+                                 fill="currentColor"
+                                 viewBox="0 0 16 16">
+                                <path d="M8 1a5 5 0 0 0-5 5v2.086a2.5 2.5 0 0 0-1.5 2.29v2.124A2.5 2.5 0 0 0 4 15h8a2.5 2.5 0 0 0 2.5-2.5v-2.124A2.5 2.5 0 0 0 13 8.086V6a5 5 0 0 0-5-5zM5 6a3 3 0 1 1 6 0v2H5V6zm3 4a1.25 1.25 0 0 1 .75 2.25V13a.75.75 0 0 1-1.5 0v-.75A1.25 1.25 0 0 1 8 10z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <p class="text-danger fw-semibold text-uppercase small mb-2">
+                        Kesalahan 403
+                    </p>
+
+                    <h1 class="h3 fw-bold mb-3">
+                        Akses Ditolak
+                    </h1>
+
+                    <p class="text-secondary mb-4">
+                        Maaf, Anda tidak memiliki izin untuk mengakses halaman ini.
+                        Silakan kembali ke dashboard atau hubungi administrator
+                        jika Anda merasa seharusnya memiliki akses.
+                    </p>
+
+                    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                        {% if current_user.is_authenticated %}
+                            {% if current_user.role == "admin" %}
+                                <a href="{{ url_for('admin.dashboard') }}"
+                                   class="btn btn-primary px-4">
+                                    Kembali ke Dashboard
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('resident.dashboard') }}"
+                                   class="btn btn-primary px-4">
+                                    Kembali ke Dashboard
+                                </a>
+                            {% endif %}
+                        {% else %}
+                            <a href="{{ url_for('auth.login') }}"
+                               class="btn btn-primary px-4">
+                                Kembali ke Halaman Login
+                            </a>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+
+            <p class="text-center text-secondary small mt-4 mb-0">
+                Secure RT · Layanan administrasi yang aman
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

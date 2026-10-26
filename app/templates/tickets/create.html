@@ -1,0 +1,217 @@
+
+{% extends "base.html" %}
+
+{% block title %}Buat Pengajuan - Secure RT{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8 col-xl-7">
+
+            <!-- Header -->
+            <div class="mb-4">
+                <a href="{{ url_for('resident.ticket_list') }}"
+                   class="text-decoration-none small">
+                    &larr; Kembali ke daftar pengajuan
+                </a>
+
+                <h1 class="h3 fw-bold mt-3 mb-2">
+                    Buat Pengajuan Administrasi
+                </h1>
+
+                <p class="text-secondary mb-0">
+                    Lengkapi formulir berikut untuk mengajukan layanan
+                    administrasi RT. Pastikan informasi yang diberikan benar.
+                </p>
+            </div>
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-4" aria-live="polite">
+                        {% for category, message in messages %}
+                            {% set alert_type = {
+                                'error': 'danger',
+                                'danger': 'danger',
+                                'success': 'success',
+                                'warning': 'warning',
+                                'info': 'info'
+                            }.get(category, 'info') %}
+
+                            <div class="alert alert-{{ alert_type }} alert-dismissible fade show"
+                                 role="alert">
+                                {{ message }}
+                                <button type="button"
+                                        class="btn-close"
+                                        data-bs-dismiss="alert"
+                                        aria-label="Tutup">
+                                </button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Form -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4 p-md-5">
+
+                    <form method="POST"
+                          action="{{ url_for('tickets.create_ticket') }}"
+                          enctype="multipart/form-data">
+
+                        {% if csrf_token is defined %}
+                            <input type="hidden" name="csrf_token"
+                                   value="{{ csrf_token() }}">
+                        {% endif %}
+
+                        <!-- Jenis layanan -->
+                        <div class="mb-4">
+                            <label for="service_type"
+                                   class="form-label fw-semibold">
+                                Jenis Layanan
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <select name="service_type"
+                                    id="service_type"
+                                    class="form-select {% if errors is defined and errors.get('service_type') %}is-invalid{% endif %}"
+                                    required>
+                                <option value="">Pilih jenis layanan</option>
+
+                                {% set service_options = [
+                                    'Surat Pengantar KTP',
+                                    'Surat Pengantar KK',
+                                    'Surat Keterangan Domisili',
+                                    'Surat Keterangan Tidak Mampu',
+                                    'Surat Keterangan Usaha',
+                                    'Surat Pengantar Pindah',
+                                    'Lainnya'
+                                ] %}
+
+                                {% for service in service_options %}
+                                    <option value="{{ service }}"
+                                        {% if form_data is defined and form_data.get('service_type') == service %}selected{% endif %}>
+                                        {{ service }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+
+                            {% if errors is defined and errors.get('service_type') %}
+                                <div class="invalid-feedback">
+                                    {{ errors.get('service_type') }}
+                                </div>
+                            {% else %}
+                                <div class="form-text">
+                                    Pilih layanan yang sesuai dengan kebutuhan Anda.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Keperluan -->
+                        <div class="mb-4">
+                            <label for="description"
+                                   class="form-label fw-semibold">
+                                Keperluan Pengajuan
+                                <span class="text-danger">*</span>
+                            </label>
+
+                            <textarea name="description"
+                                      id="description"
+                                      rows="5"
+                                      maxlength="2000"
+                                      class="form-control {% if errors is defined and errors.get('description') %}is-invalid{% endif %}"
+                                      placeholder="Jelaskan tujuan pengajuan secara singkat dan jelas..."
+                                      required>{{ form_data.get('description', '') if form_data is defined else '' }}</textarea>
+
+                            {% if errors is defined and errors.get('description') %}
+                                <div class="invalid-feedback">
+                                    {{ errors.get('description') }}
+                                </div>
+                            {% else %}
+                                <div class="form-text">
+                                    Maksimal 2.000 karakter. Jangan masukkan
+                                    informasi pribadi yang tidak diperlukan.
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Dokumen pendukung -->
+                        <div class="mb-4">
+                            <label for="attachment"
+                                   class="form-label fw-semibold">
+                                Dokumen Pendukung
+                                <span class="text-secondary fw-normal">
+                                    (opsional)
+                                </span>
+                            </label>
+
+                            <input type="file"
+                                   name="attachment"
+                                   id="attachment"
+                                   class="form-control {% if errors is defined and errors.get('attachment') %}is-invalid{% endif %}"
+                                   accept=".pdf,.png,.jpg,.jpeg">
+
+                            {% if errors is defined and errors.get('attachment') %}
+                                <div class="invalid-feedback">
+                                    {{ errors.get('attachment') }}
+                                </div>
+                            {% else %}
+                                <div class="form-text">
+                                    Format yang diizinkan: PDF, PNG, JPG, JPEG.
+                                    Ukuran maksimum: 5 MiB per file.
+                                </div>
+                            {% endif %}
+
+                            <div class="alert alert-light border mt-3 mb-0 small">
+                                <strong>Perlindungan dokumen:</strong>
+                                Unggah hanya dokumen yang diperlukan.
+                                Dokumen akan diproses oleh server sesuai
+                                mekanisme penyimpanan aplikasi. Jangan
+                                mengunggah file yang tidak relevan.
+                            </div>
+                        </div>
+
+                        <!-- Persetujuan -->
+                        <div class="form-check mb-4">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   value="yes"
+                                   id="confirm_information"
+                                   name="confirm_information"
+                                   required>
+
+                            <label class="form-check-label"
+                                   for="confirm_information">
+                                Saya memastikan informasi yang diberikan
+                                sudah benar.
+                            </label>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex flex-column flex-sm-row
+                                    justify-content-end gap-2">
+                            <a href="{{ url_for('resident.ticket_list') }}"
+                               class="btn btn-outline-secondary">
+                                Batal
+                            </a>
+
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                Kirim Pengajuan
+                            </button>
+                        </div>
+
+                        <p class="text-secondary small mt-3 mb-0">
+                            Kolom bertanda <span class="text-danger">*</span>
+                            wajib diisi. Pengajuan akan diproses setelah
+                            server menerima dan memvalidasi data.
+                        </p>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
