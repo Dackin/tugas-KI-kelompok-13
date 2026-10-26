@@ -33,16 +33,18 @@ tickets_bp = Blueprint(
     url_prefix="/tiket",
 )
 
-# Sesuaikan daftar ini dengan layanan resmi Secure RT.
+# Satu sumber kebenaran untuk dropdown dan validasi server.
 ALLOWED_SERVICE_TYPES = {
-    "Administrasi",
-    "Keamanan",
-    "Kebersihan",
-    "Infrastruktur",
+    "Surat Pengantar KTP",
+    "Surat Pengantar KK",
+    "Surat Keterangan Domisili",
+    "Surat Keterangan Tidak Mampu",
+    "Surat Keterangan Usaha",
+    "Surat Pengantar Pindah",
     "Lainnya",
 }
 
-MAX_DESCRIPTION_LENGTH = 3000
+MAX_DESCRIPTION_LENGTH = 2000
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MiB
 
 # Hanya format yang didukung pemeriksaan signature di bawah.
@@ -239,7 +241,7 @@ def create_ticket():
 
     if not description or len(description) > MAX_DESCRIPTION_LENGTH:
         flash(
-            "Deskripsi wajib diisi dan maksimal 3000 karakter.",
+            "Deskripsi wajib diisi dan maksimal 2000 karakter.",
             "danger",
         )
         return render_template(

@@ -79,17 +79,7 @@
                                     required>
                                 <option value="">Pilih jenis layanan</option>
 
-                                {% set service_options = [
-                                    'Surat Pengantar KTP',
-                                    'Surat Pengantar KK',
-                                    'Surat Keterangan Domisili',
-                                    'Surat Keterangan Tidak Mampu',
-                                    'Surat Keterangan Usaha',
-                                    'Surat Pengantar Pindah',
-                                    'Lainnya'
-                                ] %}
-
-                                {% for service in service_options %}
+                                {% for service in service_types %}
                                     <option value="{{ service }}"
                                         {% if form_data is defined and form_data.get('service_type') == service %}selected{% endif %}>
                                         {{ service }}

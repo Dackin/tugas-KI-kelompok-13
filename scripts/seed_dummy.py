@@ -48,25 +48,29 @@ WILAYAH = [
     ("Kebayoran", "Kebayoran Baru", "Jakarta Selatan"),
 ]
 LAYANAN = {
-    "Administrasi": [
-        "Permohonan surat domisili untuk pendaftaran sekolah anak.",
-        "Permohonan surat keterangan usaha untuk keperluan bank.",
-        "Permohonan pengantar pembuatan KTP elektronik.",
+    "Surat Pengantar KTP": [
+        "Permohonan surat pengantar pembuatan KTP elektronik.",
+        "Surat pengantar KTP hilang untuk keperluan penggantian.",
     ],
-    "Keamanan": [
-        "Permintaan penambahan lampu penerangan di gang RT.",
-        "Laporan pintu gerbang RT rusak dan perlu diperbaiki.",
-        "Permintaan jadwal ronda tambahan untuk bulan depan.",
+    "Surat Pengantar KK": [
+        "Permohonan surat pengantar pembaruan kartu keluarga.",
+        "Surat pengantar KK untuk pendaftaran sekolah anak.",
     ],
-    "Kebersihan": [
-        "Pengangkutan sampah terlambat tiga hari berturut-turut.",
-        "Permintaan penambahan tempat sampah di depan balai warga.",
-        "Laporan saluran air tersumbat di RT 003.",
+    "Surat Keterangan Domisili": [
+        "Permohonan surat keterangan domisili untuk pendaftaran sekolah.",
+        "Surat keterangan domisili untuk keperluan administrasi bank.",
     ],
-    "Infrastruktur": [
-        "Perbaikan jalan berlubang di depan rumah nomor 12.",
-        "Permohonan perbaikan selokan yang longsor.",
-        "Usulan pengecatan ulang pos ronda.",
+    "Surat Keterangan Tidak Mampu": [
+        "Permohonan surat keterangan tidak mampu untuk beasiswa.",
+        "Surat keterangan tidak mampu untuk keringanan biaya rumah sakit.",
+    ],
+    "Surat Keterangan Usaha": [
+        "Permohonan surat keterangan usaha untuk pengajuan kredit.",
+        "Surat keterangan usaha untuk pendaftaran UMKM.",
+    ],
+    "Surat Pengantar Pindah": [
+        "Permohonan surat pengantar pindah domisili.",
+        "Surat pengantar pindah untuk keperluan pekerjaan.",
     ],
     "Lainnya": [
         "Permohonan izin kegiatan kerja bakti akhir bulan.",
