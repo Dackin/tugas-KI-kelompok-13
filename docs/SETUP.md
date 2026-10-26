@@ -44,6 +44,24 @@ python -c "import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)
 | `CRYPTO_MASTER_KEY_B64` | hasil perintah kedua, format Base64 (dibaca `app/crypto/keys.py`) |
 | `PRIVATE_STORAGE_DIR` | biarkan `private_storage` |
 | `MAX_CONTENT_LENGTH_MB` | biarkan `50` |
+| `ADMIN_INVITE_CODE` | opsional; isi bila ingin bisa mendaftarkan admin lewat form |
+| `SESSION_COOKIE_SECURE` | `false` di lokal, `true` hanya saat produksi HTTPS |
+
+### Membuat akun admin
+
+Dua cara:
+
+1. Isi `ADMIN_INVITE_CODE` di `.env`, jalankan ulang aplikasi, lalu daftar di
+   `/auth/register` dengan mengisi field "Kode admin". Semua pendaftaran tanpa
+   kode tetap menjadi `warga`.
+2. Kosongkan `ADMIN_INVITE_CODE`, lalu buat/promosikan admin lewat script:
+
+   ```bash
+   python scripts/seed.py --username admin --password 'rahasia123'
+   ```
+
+   Script ini membuat `User` + `Resident`, atau mengubah user yang sudah ada
+   menjadi admin. Aman dijalankan berulang.
 
 `DATABASE_URL` sengaja dikomentari supaya memakai default SQLite di
 `instance/secure_rt_dev.sqlite3`. Jangan diisi kosong (`DATABASE_URL=`) —

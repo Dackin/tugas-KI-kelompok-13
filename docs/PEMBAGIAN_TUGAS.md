@@ -100,6 +100,37 @@ membaca file.
 
 Pemetaan error: `CryptoError` (ciphertext rusak, path traversal, metadata tidak valid) → `400`.
 
+### Helper autentikasi (sudah tersedia dari Anggota 1)
+
+```python
+from flask_login import current_user, login_required
+from app.auth.utils import role_required, admin_required
+
+current_user.is_admin     # bool
+current_user.resident     # Resident milik user yang login
+role_required("admin")    # 403 untuk role lain, redirect untuk anonim
+```
+
+Nama blueprint dan endpoint dipakai `default_dashboard_url()`:
+
+| Blueprint | Endpoint wajib |
+|---|---|
+| `resident` | `resident.dashboard` |
+| `admin` | `admin.dashboard` |
+| `tickets` | `tickets.create`, `tickets.detail`, `tickets.upload`, `tickets.download` |
+
+Tanpa endpoint itu, login tetap jatuh ke `/` (fallback), tetapi navigasi
+pengguna jadi tidak jelas. Gunakan nama di atas.
+
+Registrasi admin: `/auth/register` menerima field `admin_code`. Bila
+`ADMIN_INVITE_CODE` tidak diset, semua pendaftaran menjadi `warga`.
+
+### Audit log
+
+`AuditLog` wajib ditulis minimal untuk: perubahan status tiket, upload dokumen,
+dan download dokumen yang berhasil. Isi `action`, `resource_type`, `resource_id`,
+dan `actor_user_id`.
+
 ### Status tiket
 
 `Diajukan` → `Diproses` → `Selesai` atau `Ditolak`.
