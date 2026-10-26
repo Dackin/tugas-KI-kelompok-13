@@ -200,8 +200,13 @@
                                                     {% if attachment.size_bytes is defined
                                                           and attachment.size_bytes %}
                                                         &middot;
-                                                        {{ "%.2f"|format(attachment.size_bytes / 1048576) }}
-                                                        MiB
+                                                        {% if attachment.size_bytes >= 1048576 %}
+                                                            {{ "%.2f"|format(attachment.size_bytes / 1048576) }}
+                                                            MiB
+                                                        {% else %}
+                                                            {{ "%.1f"|format(attachment.size_bytes / 1024) }}
+                                                            KiB
+                                                        {% endif %}
                                                     {% endif %}
                                                 </div>
                                             </div>
@@ -236,7 +241,7 @@
             </div>
 
             <!-- Unggah ulang ketika perlu revisi -->
-            {% if ticket.status == 'Perlu Revisi' and allow_reupload|default(false) %}
+            {% if ticket.status in ['Diajukan', 'Perlu Revisi'] %}
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white py-3">
                         <h2 class="h5 fw-bold mb-0">

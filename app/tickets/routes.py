@@ -2,7 +2,6 @@
 
 import io
 import logging
-import uuid
 from pathlib import PurePath
 
 from flask import (
@@ -18,17 +17,14 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import HTTPException
 from werkzeug.utils import secure_filename
 
+from app.crypto import get_master_key
+from app.crypto.errors import CryptoError
+from app.crypto.storage import decrypt_file, delete_file, encrypt_file
 from app.extensions import db
-from app.models import User, Resident, Ticket, Document
-
-# Kontrak yang harus disediakan oleh anggota tim kriptografi.
-from app.crypto.storage import (
-    save_encrypted_file,
-    load_decrypted_file,
-    delete_encrypted_file,
-)
+from app.models import Document, Resident, Ticket, User
 
 
 tickets_bp = Blueprint(
@@ -153,6 +149,60 @@ def _validate_and_read_upload(upload):
     return display_name, extension, content_type, data
 
 
+def _document_context(ticket, filename):
+    """Context yang diautentikasi sebagai AAD saat enkripsi/dekripsi."""
+    return {
+        "ticket_id": ticket.id,
+        "uploaded_by_user_id": current_user.id,
+        "original_filename": filename,
+    }
+
+
+def _simpan_lampiran(ticket, upload):
+    """Validasi, enkripsi, lalu kembalikan (Document, StoredFile)."""
+    display_name, _extension, content_type, data = _validate_and_read_upload(upload)
+
+    batas = current_app.config.get("MAX_DOCUMENTS_PER_TICKET", 5)
+    if Document.query.filter_by(ticket_id=ticket.id).count() >= batas:
+        abort(400, description="Jumlah lampiran tiket sudah mencapai batas.")
+
+    try:
+        stored = encrypt_file(
+            data,
+            storage_root=current_app.config["PRIVATE_STORAGE_DIR"],
+            key=get_master_key(current_app.config),
+            context=_document_context(ticket, display_name),
+        )
+    except CryptoError:
+        logger.exception("Gagal mengenkripsi lampiran.")
+        abort(500, description="Lampiran gagal diproses.")
+
+    document = Document(
+        ticket_id=ticket.id,
+        uploaded_by_user_id=current_user.id,
+        original_filename=display_name,
+        ciphertext_path=stored.ciphertext_path,
+        algorithm=stored.algorithm,
+        crypto_metadata_json=stored.crypto_metadata_json,
+        content_type=content_type,
+        size_bytes=len(data),
+    )
+    return document, stored
+
+
+def _hapus_ciphertext(document):
+    """Kompensasi bila metadata gagal disimpan setelah file terenkripsi."""
+    try:
+        delete_file(
+            ciphertext_path=document.ciphertext_path,
+            storage_root=current_app.config["PRIVATE_STORAGE_DIR"],
+        )
+    except Exception:
+        logger.exception(
+            "Pembersihan ciphertext yatim gagal: %s", document.ciphertext_path
+        )
+
+
 @tickets_bp.route("/buat", methods=["GET", "POST"])
 @login_required
 def create_ticket():
@@ -197,6 +247,16 @@ def create_ticket():
             service_types=sorted(ALLOWED_SERVICE_TYPES),
         ), 400
 
+    if request.form.get("confirm_information") != "yes":
+        flash(
+            "Centang pernyataan bahwa informasi yang diberikan sudah benar.",
+            "danger",
+        )
+        return render_template(
+            "tickets/create.html",
+            service_types=sorted(ALLOWED_SERVICE_TYPES),
+        ), 400
+
     ticket = Ticket(
         resident_id=resident.id,
         service_type=service_type,
@@ -205,12 +265,26 @@ def create_ticket():
         status="Diajukan",
     )
 
+    document = None
     try:
         db.session.add(ticket)
+        db.session.flush()
+
+        upload = request.files.get("attachment")
+        if upload is not None and upload.filename:
+            document, _stored = _simpan_lampiran(ticket, upload)
+            db.session.add(document)
+
         db.session.commit()
 
-    except SQLAlchemyError:
+    except HTTPException:
         db.session.rollback()
+        raise
+
+    except Exception:
+        db.session.rollback()
+        if document is not None:
+            _hapus_ciphertext(document)
         logger.exception("Gagal membuat tiket baru.")
         flash("Pengajuan tiket gagal diproses. Silakan coba lagi.", "danger")
         return render_template(
@@ -242,7 +316,7 @@ def ticket_detail(ticket_id):
     return render_template(
         "tickets/detail.html",
         ticket=ticket,
-        documents=documents,
+        attachments=documents,
     )
 
 
@@ -260,55 +334,25 @@ def upload_attachment(ticket_id):
     # Otorisasi harus terjadi sebelum membaca atau menyimpan file.
     ticket = _get_owned_ticket(ticket_id)
 
-    upload = request.files.get("file")
-    display_name, extension, content_type, data = (
-        _validate_and_read_upload(upload)
-    )
+    if ticket.status not in {"Diajukan", "Perlu Revisi"}:
+        abort(400, description="Lampiran tidak dapat diunggah pada status ini.")
 
-    # Batas jumlah lampiran dapat diatur sesuai kebutuhan proyek.
-    max_documents = current_app.config.get("MAX_DOCUMENTS_PER_TICKET", 5)
+    upload = request.files.get("attachment")
 
-    document_count = Document.query.filter_by(
-        ticket_id=ticket.id
-    ).count()
-
-    if document_count >= max_documents:
-        abort(400, description="Jumlah lampiran tiket sudah mencapai batas.")
-
-    # Identifier acak, bukan nama file dari browser.
-    storage_key = uuid.uuid4().hex
-
-    document = Document(
-        ticket_id=ticket.id,
-        storage_key=storage_key,
-        original_filename=display_name,
-        content_type=content_type,
-        size_bytes=len(data),
-    )
-
-    stored = False
-
+    document = None
     try:
-        # Data plaintext hanya diberikan ke layanan kriptografi.
-        save_encrypted_file(storage_key, data)
-        stored = True
-
+        document, _stored = _simpan_lampiran(ticket, upload)
         db.session.add(document)
         db.session.commit()
 
+    except HTTPException:
+        db.session.rollback()
+        raise
+
     except Exception:
         db.session.rollback()
-
-        # Kompensasi jika file tersimpan tetapi metadata gagal.
-        if stored:
-            try:
-                delete_encrypted_file(storage_key)
-            except Exception:
-                logger.exception(
-                    "Pembersihan file yatim gagal; storage_key=%s",
-                    storage_key,
-                )
-
+        if document is not None:
+            _hapus_ciphertext(document)
         logger.exception("Gagal menyimpan lampiran.")
         flash("Lampiran gagal disimpan. Silakan coba lagi.", "danger")
         return redirect(
@@ -345,8 +389,24 @@ def download_attachment(ticket_id, document_id):
         abort(404)
 
     try:
-        # Layanan mengembalikan plaintext hanya setelah dekripsi berhasil.
-        plaintext = load_decrypted_file(document.storage_key)
+        plaintext = decrypt_file(
+            ciphertext_path=document.ciphertext_path,
+            storage_root=current_app.config["PRIVATE_STORAGE_DIR"],
+            key=get_master_key(current_app.config),
+            context={
+                "ticket_id": document.ticket_id,
+                "uploaded_by_user_id": document.uploaded_by_user_id,
+                "original_filename": document.original_filename,
+            },
+            algorithm=document.algorithm,
+            metadata=document.crypto_metadata_json,
+        )
+
+    except CryptoError:
+        logger.warning(
+            "Lampiran gagal didekripsi; document_id=%s", document.id
+        )
+        abort(400, description="Lampiran tidak dapat dibuka.")
 
     except Exception:
         logger.exception(
@@ -358,7 +418,7 @@ def download_attachment(ticket_id, document_id):
     # File dikirim dari memori setelah dekripsi, bukan dari static/.
     return send_file(
         io.BytesIO(plaintext),
-        mimetype=document.content_type,
+        mimetype=document.content_type or "application/octet-stream",
         as_attachment=True,
         download_name=document.original_filename,
         max_age=0,

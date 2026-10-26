@@ -126,7 +126,11 @@
                                         Nama Pemohon
                                     </div>
                                     <div class="fw-semibold text-break">
-                                        {{ applicant_name }}
+                                        {% if ticket.resident %}
+                                            {{ ticket.resident.full_name }}
+                                        {% else %}
+                                            <span class="text-secondary">-</span>
+                                        {% endif %}
                                     </div>
                                 </div>
 

@@ -1,1 +1,54 @@
-{% extends "base.html" %}{% block content %}<h1>Secure RT</h1><p>Sistem layanan administrasi RT dan penyimpanan dokumen terenkripsi.</p><p>Antarmuka ini masih placeholder.</p>{% endblock %}
+{% extends "base.html" %}
+
+{% block title %}Secure RT — Layanan Administrasi RT{% endblock %}
+
+{% block content %}
+<div class="row align-items-center g-5 py-4">
+    <div class="col-lg-7">
+        <h1 class="display-5 fw-bold mb-3">
+            Layanan administrasi RT, aman dan terpusat
+        </h1>
+        <p class="lead text-secondary mb-4">
+            Ajukan surat, unggah dokumen pendukung, dan pantau status
+            pengajuan tanpa bolak-balik ke sekretariat. Dokumen warga
+            disimpan dalam bentuk terenkripsi.
+        </p>
+        <div class="d-flex flex-column flex-sm-row gap-2">
+            <a class="btn btn-primary btn-lg" href="{{ url_for('auth.register') }}">
+                Daftar sebagai warga
+            </a>
+            <a class="btn btn-outline-primary btn-lg" href="{{ url_for('auth.login') }}">
+                Masuk
+            </a>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-bold mb-3">Yang bisa dilakukan</h2>
+                <ul class="list-unstyled mb-0 d-grid gap-3">
+                    <li>
+                        <strong>Pengajuan online.</strong>
+                        <span class="text-secondary">
+                            Buat tiket layanan dan pantau statusnya.
+                        </span>
+                    </li>
+                    <li>
+                        <strong>Dokumen terenkripsi.</strong>
+                        <span class="text-secondary">
+                            Lampiran dienkripsi AES-256-GCM sebelum disimpan.
+                        </span>
+                    </li>
+                    <li>
+                        <strong>Akses berbasis peran.</strong>
+                        <span class="text-secondary">
+                            Warga hanya melihat tiketnya sendiri; admin memproses.
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

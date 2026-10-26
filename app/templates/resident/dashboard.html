@@ -14,7 +14,7 @@
 
             {% if resident %}
                 <p class="text-secondary mb-0">
-                    Halo, {{ resident.nama if resident.nama else 'Warga' }}!
+                    Halo, {{ resident.full_name if resident.full_name else 'Warga' }}!
                     Selamat datang di layanan Secure RT.
                 </p>
             {% else %}

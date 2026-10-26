@@ -1,7 +1,7 @@
 # Anggota 3: dashboard warga dan daftar tiket milik pengguna yang login.
 
 
-from flask import Blueprint, abort, flash, render_template
+from flask import Blueprint, abort, flash, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
@@ -141,9 +141,16 @@ def ticket_list():
             status_counts={}
         )
 
-    # Filter wajib berdasarkan resident.id dari current_user.
+    # Filter status hanya mempersempit daftar milik sendiri.
+    selected_status = request.args.get("status", "").strip()
+    query = _get_ticket_query(resident.id)
+    if selected_status in {
+        "Diajukan", "Diproses", "Perlu Revisi", "Selesai", "Ditolak"
+    }:
+        query = query.filter(Ticket.status == selected_status)
+
     tickets = (
-        _get_ticket_query(resident.id)
+        query
         .order_by(
             Ticket.created_at.desc(),
             Ticket.id.desc()
@@ -158,5 +165,6 @@ def ticket_list():
         resident=resident,
         tickets=tickets,
         total_tickets=len(tickets),
-        status_counts=status_counts
+        status_counts=status_counts,
+        selected_status=selected_status,
     )

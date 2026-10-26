@@ -274,7 +274,11 @@
                                     </td>
 
                                     <td>
-                                        {{ ticket.applicant_name }}
+                                        {% if ticket.resident %}
+                                            {{ ticket.resident.full_name }}
+                                        {% else %}
+                                            <span class="text-secondary">-</span>
+                                        {% endif %}
                                     </td>
 
                                     <td>

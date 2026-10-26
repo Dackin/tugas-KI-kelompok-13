@@ -147,6 +147,26 @@ def encrypt_file(
     )
 
 
+def delete_file(
+    *,
+    ciphertext_path: str,
+    storage_root: str | os.PathLike[str],
+) -> None:
+    """Hapus ciphertext dengan validasi path yang sama seperti dekripsi."""
+    root = _storage_root(storage_root)
+    relative_path = Path(ciphertext_path)
+    if (
+        relative_path.is_absolute()
+        or len(relative_path.parts) != 1
+        or relative_path.suffix != ".bin"
+    ):
+        raise CryptoError("decryption failed")
+    resolved_path = (root / relative_path).resolve()
+    if not resolved_path.is_relative_to(root):
+        raise CryptoError("decryption failed")
+    resolved_path.unlink(missing_ok=True)
+
+
 def decrypt_file(
     *,
     ciphertext_path: str,

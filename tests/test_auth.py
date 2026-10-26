@@ -398,7 +398,9 @@ def test_login_requires_csrf_token_when_enabled(app, client, make_user):
         "/auth/login",
         data={"username": "warga1", "password": PASSWORD},
     )
-    assert response.status_code == 200
+    # CSRFProtect menolak lebih awal dengan 400; tanpa CSRFProtect,
+    # FlaskForm akan mengembalikan 200 dengan error validasi.
+    assert response.status_code in (200, 400)
 
     with client.session_transaction() as session:
         assert "_user_id" not in session

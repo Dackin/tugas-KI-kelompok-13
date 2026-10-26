@@ -100,7 +100,21 @@ Tes memakai database in-memory dan folder penyimpanan sementara
 (`tests/conftest.py`), jadi tidak menyentuh `instance/` maupun
 `private_storage/`.
 
-## 6. Benchmark kriptografi
+## 6. Data dummy (30 kartu keluarga)
+
+```bash
+python scripts/seed_dummy.py --reset --yes
+```
+
+Menghasilkan 30 KK (akun `kk01`..`kk30`), tiket dengan status bervariasi, dan
+lampiran PDF valid. `--reset` menghapus seluruh data lama; tanpa itu script
+menolak menimpa. Password default `rahasia123` dan bisa diganti dengan
+`--password`.
+
+Akun admin: `admin` / `rahasia123` (dibuat bila belum ada). Detail klasifikasi
+data dan lapisan enkripsi: `docs/KEAMANAN_DATA.md`.
+
+## 7. Benchmark kriptografi
 
 Setelah `app/crypto/` selesai:
 

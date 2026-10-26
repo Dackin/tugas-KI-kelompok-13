@@ -1,13 +1,10 @@
 """Anggota 4: uji penyimpanan privat dan download melalui route terproteksi.
 
 Kontrak yang diuji (lihat docs/PEMBAGIAN_TUGAS.md):
-- upload  : POST /tickets/<id>/dokumen, multipart field `document`
-- download: GET /documents/<id>/download
+- upload  : POST /tiket/<id>/lampiran, multipart field `attachment`
+- download: GET  /tiket/<id>/lampiran/<id>/unduh
 - `Document.ciphertext_path` relatif terhadap PRIVATE_STORAGE_DIR
 - route download memeriksa login + kepemilikan SEBELUM membaca file
-
-Tes ini merah selama Anggota 2 (crypto/storage) dan Anggota 3 (route) belum
-selesai. Itu wajar: tes ini adalah spesifikasi.
 """
 
 import io
@@ -17,7 +14,8 @@ from pathlib import Path
 from app import db
 from app.models import Document, Resident, Ticket, User
 
-PLAINTEXT = b"RAHASIA_KTP_WARGA_A " + b"isi-dokumen-" * 40
+# Harus lolos pemeriksaan signature %PDF- di route upload.
+PLAINTEXT = b"%PDF-1.4\n" + b"RAHASIA_KTP_WARGA_A\n" + b"isi-dokumen\n" * 40 + b"%%EOF\n"
 NAMA_ASLI = "ktp_asli_warga_a.pdf"
 
 
@@ -27,7 +25,7 @@ def _tiket_warga_a(app) -> int:
         resident = Resident.query.filter_by(user_id=user.id).one()
         tiket = Ticket(
             resident_id=resident.id,
-            service_type="Surat Domisili",
+            service_type="Administrasi",
             description="Lampiran KTP",
         )
         db.session.add(tiket)
@@ -37,8 +35,8 @@ def _tiket_warga_a(app) -> int:
 
 def _unggah(client, tiket_id, isi=PLAINTEXT, nama=NAMA_ASLI):
     return client.post(
-        f"/tickets/{tiket_id}/dokumen",
-        data={"document": (io.BytesIO(isi), nama)},
+        f"/tiket/{tiket_id}/lampiran",
+        data={"attachment": (io.BytesIO(isi), nama)},
         content_type="multipart/form-data",
     )
 
@@ -102,7 +100,7 @@ def test_pemilik_bisa_unduh_dan_isi_identik(app, client, login):
     _unggah(client, tiket_id)
     dokumen = _dokumen_terakhir(app)
 
-    r = client.get(f"/documents/{dokumen.id}/download")
+    r = client.get(f"/tiket/{dokumen.ticket_id}/lampiran/{dokumen.id}/unduh")
     assert r.status_code == 200
     assert r.data == PLAINTEXT
     assert "attachment" in r.headers.get("Content-Disposition", "")
@@ -118,8 +116,8 @@ def test_ciphertext_rusak_tidak_menghasilkan_plaintext(app, client, login):
     assert path.is_file(), "file ciphertext tidak ditemukan"
     path.write_bytes(b"rusak")
 
-    r = client.get(f"/documents/{dokumen.id}/download")
-    assert r.status_code == 400, "IntegrityError harus dipetakan ke 400, bukan 200/500"
+    r = client.get(f"/tiket/{dokumen.ticket_id}/lampiran/{dokumen.id}/unduh")
+    assert r.status_code == 400, "CryptoError harus dipetakan ke 400, bukan 200/500"
     assert PLAINTEXT not in r.data
 
 
@@ -152,12 +150,14 @@ def test_menolak_path_traversal(app, client, login):
             original_filename="palsu.pdf",
             ciphertext_path="../../../../etc/passwd",
             algorithm="AES-256-GCM",
-            crypto_metadata_json="{}",
+            crypto_metadata_json='{"algorithm": "AES-256-GCM"}',
+            content_type="application/pdf",
+            size_bytes=10,
         )
         db.session.add(jahat)
         db.session.commit()
         jahat_id = jahat.id
 
-    r = client.get(f"/documents/{jahat_id}/download")
+    r = client.get(f"/tiket/{tiket_id}/lampiran/{jahat_id}/unduh")
     assert r.status_code in (400, 403), "path traversal harus 400/403, bukan 404 (ambigu)"
     assert b"root:" not in r.data

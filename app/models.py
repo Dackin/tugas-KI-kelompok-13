@@ -4,6 +4,7 @@ from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
+from app.crypto.fields import EncryptedText
 
 
 def utcnow():
@@ -68,8 +69,10 @@ class Resident(db.Model):
         nullable=False,
         index=True,
     )
-    full_name = db.Column(db.String(160), nullable=False)
-    address = db.Column(db.String(255), nullable=False)
+    full_name = db.Column(EncryptedText(), nullable=False)
+    address = db.Column(EncryptedText(), nullable=False)
+    nik = db.Column(EncryptedText())
+    family_card_number = db.Column(EncryptedText())
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -96,7 +99,7 @@ class Ticket(db.Model):
         index=True,
     )
     service_type = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=False)
+    description = db.Column(EncryptedText(), nullable=False)
     status = db.Column(
         db.String(30), nullable=False, default="Diajukan", index=True
     )
@@ -143,7 +146,7 @@ class TicketMessage(db.Model):
         nullable=False,
         index=True,
     )
-    message = db.Column(db.Text, nullable=False)
+    message = db.Column(EncryptedText(), nullable=False)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -175,6 +178,8 @@ class Document(db.Model):
     ciphertext_path = db.Column(db.String(500), nullable=False)
     algorithm = db.Column(db.String(30), nullable=False)
     crypto_metadata_json = db.Column(db.Text, nullable=False, default="{}")
+    content_type = db.Column(db.String(100))
+    size_bytes = db.Column(db.Integer)
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -194,6 +199,7 @@ class AuditLog(db.Model):
     action = db.Column(db.String(100), nullable=False)
     resource_type = db.Column(db.String(50), nullable=False)
     resource_id = db.Column(db.String(100))
+    detail = db.Column(EncryptedText())
     created_at = db.Column(
         db.DateTime(timezone=True), nullable=False, default=utcnow
     )

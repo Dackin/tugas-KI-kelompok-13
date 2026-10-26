@@ -1,6 +1,7 @@
 # Anggota 3: antrean tiket admin dan perubahan status.
 
 import io
+import json
 import logging
 
 from flask import (
@@ -18,19 +19,11 @@ from flask_login import current_user, login_required
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import HTTPException
 
+from app.crypto import get_master_key
+from app.crypto.errors import CryptoError
+from app.crypto.storage import decrypt_file
 from app.extensions import db
-from app.models import User, Resident, Ticket, Document
-
-# Model audit bersifat opsional. Tim database perlu menyediakan
-# model ini jika audit log belum tersedia.
-try:
-    from app.models import TicketAuditLog
-except ImportError:
-    TicketAuditLog = None
-
-# Kontrak layanan kriptografi: fungsi ini harus benar-benar
-# diimplementasikan dalam app/crypto/storage.py.
-from app.crypto.storage import load_decrypted_file
+from app.models import AuditLog, Document, Resident, Ticket, User
 
 
 admin_bp = Blueprint(
@@ -127,27 +120,21 @@ def _validate_admin_note(raw_note):
 
 
 def _record_audit(ticket, old_status, new_status, note):
-    """
-    Catat perubahan dalam transaksi database yang sama.
-    Jika model audit belum tersedia, keluarkan peringatan agar
-    konfigurasi produksi tidak mengklaim audit sudah aktif.
-    """
-    if TicketAuditLog is None:
-        current_app.logger.warning(
-            "TicketAuditLog belum tersedia; perubahan tiket "
-            "tidak memiliki audit log permanen. ticket_id=%s",
-            ticket.id,
-        )
-        return
-
-    audit = TicketAuditLog(
-        ticket_id=ticket.id,
-        admin_user_id=current_user.id,
-        old_status=old_status,
-        new_status=new_status,
-        note=note or None,
+    """Catat perubahan status dalam transaksi database yang sama."""
+    audit = AuditLog(
+        actor_user_id=current_user.id,
+        action="ubah_status",
+        resource_type="ticket",
+        resource_id=str(ticket.id),
+        detail=json.dumps(
+            {
+                "old_status": old_status,
+                "new_status": new_status,
+                "note": note or None,
+            },
+            ensure_ascii=False,
+        ),
     )
-
     db.session.add(audit)
 
 
@@ -158,12 +145,28 @@ def dashboard():
 
     _require_admin()
 
+    selected_status = request.args.get("status", "").strip()
+    selected_service_type = request.args.get("service_type", "").strip()
+
     try:
         status_counts = _get_status_counts()
 
-        # Query eksplisit, tidak mengasumsikan relasi ORM.
+        service_options = [
+            row[0]
+            for row in db.session.query(Ticket.service_type)
+            .distinct()
+            .order_by(Ticket.service_type)
+            .all()
+        ]
+
+        query = Ticket.query
+        if selected_status in ALLOWED_STATUSES:
+            query = query.filter(Ticket.status == selected_status)
+        if selected_service_type in service_options:
+            query = query.filter(Ticket.service_type == selected_service_type)
+
         tickets = (
-            Ticket.query
+            query
             .order_by(
                 Ticket.created_at.desc(),
                 Ticket.id.desc(),
@@ -184,6 +187,10 @@ def dashboard():
         status_counts=status_counts,
         total_tickets=total_tickets,
         allowed_statuses=sorted(ALLOWED_STATUSES),
+        status_options=sorted(ALLOWED_STATUSES),
+        service_options=service_options,
+        selected_status=selected_status,
+        selected_service_type=selected_service_type,
     )
 
 
@@ -204,21 +211,18 @@ def ticket_detail(ticket_id):
         .all()
     )
 
-    audit_logs = []
-
-    if TicketAuditLog is not None:
-        audit_logs = (
-            TicketAuditLog.query
-            .filter_by(ticket_id=ticket.id)
-            .order_by(TicketAuditLog.created_at.desc())
-            .limit(50)
-            .all()
-        )
+    audit_logs = (
+        AuditLog.query
+        .filter_by(resource_type="ticket", resource_id=str(ticket.id))
+        .order_by(AuditLog.created_at.desc())
+        .limit(50)
+        .all()
+    )
 
     return render_template(
         "admin/ticket_detail.html",
         ticket=ticket,
-        documents=documents,
+        attachments=documents,
         audit_logs=audit_logs,
         allowed_statuses=sorted(ALLOWED_STATUSES),
         allowed_transitions=ALLOWED_TRANSITIONS.get(
@@ -316,8 +320,24 @@ def download_attachment(ticket_id, document_id):
         abort(404)
 
     try:
-        # storage_key berasal dari database tepercaya, bukan request.
-        plaintext = load_decrypted_file(document.storage_key)
+        plaintext = decrypt_file(
+            ciphertext_path=document.ciphertext_path,
+            storage_root=current_app.config["PRIVATE_STORAGE_DIR"],
+            key=get_master_key(current_app.config),
+            context={
+                "ticket_id": document.ticket_id,
+                "uploaded_by_user_id": document.uploaded_by_user_id,
+                "original_filename": document.original_filename,
+            },
+            algorithm=document.algorithm,
+            metadata=document.crypto_metadata_json,
+        )
+
+    except CryptoError:
+        logger.warning(
+            "Lampiran gagal didekripsi; document_id=%s", document.id
+        )
+        abort(400, description="Lampiran tidak dapat dibuka.")
 
     except Exception:
         logger.exception(

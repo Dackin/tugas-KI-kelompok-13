@@ -1,9 +1,13 @@
 """Anggota 4: pastikan warga A tidak bisa melihat/mengunduh dokumen warga B.
 
-Tes ini ditulis terhadap kontrak route (lihat docs/PEMBAGIAN_TUGAS.md).
-Selama route belum ada, tes ini MERAH dengan status 404 — itu wajar.
-Hijau = Anggota 1 (auth) dan Anggota 3 (tiket/dokumen/admin) sudah selesai.
+Tes ini ditulis terhadap route yang benar-benar dikirim Anggota 3:
+    /warga/dashboard
+    /tiket/<id>
+    /tiket/<id>/lampiran/<id>/unduh
+    /admin/dashboard
+    /admin/tiket/<id>/status
 """
+
 from app import db
 from app.models import Document, Resident, Ticket, User
 
@@ -38,8 +42,10 @@ def _siapkan_data(app):
             uploaded_by_user_id=user_b_id,
             original_filename="ktp_warga_b.pdf",
             ciphertext_path="2026/10/palsu.bin",
-            algorithm="AES-GCM",
+            algorithm="AES-256-GCM",
             crypto_metadata_json="{}",
+            content_type="application/pdf",
+            size_bytes=10,
         )
         db.session.add(dokumen_b)
         db.session.commit()
@@ -47,13 +53,13 @@ def _siapkan_data(app):
 
 
 def test_anonim_diarahkan_ke_login(client):
-    r = client.get("/resident/")
+    r = client.get("/warga/dashboard")
     assert r.status_code == 302
     assert "/auth/login" in r.headers["Location"]
 
 
 def test_anonim_tidak_bisa_unduh_dokumen(client):
-    r = client.get("/documents/1/download")
+    r = client.get("/tiket/1/lampiran/1/unduh")
     assert r.status_code == 302
     assert "/auth/login" in r.headers.get("Location", "")
 
@@ -61,7 +67,7 @@ def test_anonim_tidak_bisa_unduh_dokumen(client):
 def test_warga_hanya_melihat_tiket_miliknya(app, client, login):
     _siapkan_data(app)
     login("warga_a")
-    r = client.get("/resident/")
+    r = client.get("/warga/dashboard")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "WARGA_A" in body
@@ -73,7 +79,7 @@ def test_warga_bisa_buka_tiket_miliknya(app, client, login):
     karena route-nya belum ada (404)."""
     tiket_a_id, _, _ = _siapkan_data(app)
     login("warga_a")
-    r = client.get(f"/tickets/{tiket_a_id}")
+    r = client.get(f"/tiket/{tiket_a_id}")
     assert r.status_code == 200
     assert b"ISI_TIKET_WARGA_A" in r.data
 
@@ -81,29 +87,29 @@ def test_warga_bisa_buka_tiket_miliknya(app, client, login):
 def test_warga_tidak_bisa_buka_tiket_warga_lain(app, client, login):
     _, tiket_b_id, _ = _siapkan_data(app)
     login("warga_a")
-    r = client.get(f"/tickets/{tiket_b_id}")
+    r = client.get(f"/tiket/{tiket_b_id}")
     assert r.status_code in (403, 404)
     assert b"ISI_TIKET_WARGA_B" not in r.data
 
 
 def test_warga_tidak_bisa_unduh_dokumen_warga_lain(app, client, login):
-    _, _, dokumen_b_id = _siapkan_data(app)
+    _, tiket_b_id, dokumen_b_id = _siapkan_data(app)
     login("warga_a")
-    r = client.get(f"/documents/{dokumen_b_id}/download")
+    r = client.get(f"/tiket/{tiket_b_id}/lampiran/{dokumen_b_id}/unduh")
     assert r.status_code in (403, 404), "harus ditolak, bukan error 500"
     assert b"ktp_warga_b" not in r.data
 
 
 def test_warga_tidak_bisa_masuk_admin(app, client, login):
     login("warga_a")
-    r = client.get("/admin/tiket")
+    r = client.get("/admin/dashboard")
     assert r.status_code == 403
 
 
 def test_admin_bisa_melihat_semua_tiket(app, client, login):
     _siapkan_data(app)
     login("admin")
-    r = client.get("/admin/tiket")
+    r = client.get("/admin/dashboard")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "WARGA_A" in body
@@ -113,6 +119,9 @@ def test_admin_bisa_melihat_semua_tiket(app, client, login):
 def test_admin_bisa_mengubah_status(app, client, login):
     tiket_a_id, _, _ = _siapkan_data(app)
     login("admin")
-    client.post(f"/admin/tiket/{tiket_a_id}/status", data={"status": "Diproses"})
+    client.post(
+        f"/admin/tiket/{tiket_a_id}/status",
+        data={"status": "Diproses"},
+    )
     with app.app_context():
         assert db.session.get(Ticket, tiket_a_id).status == "Diproses"

@@ -1,7 +1,11 @@
+import base64
+
 import pytest
 from werkzeug.security import generate_password_hash
 from app import create_app, db
 from app.models import User, Resident   # import modul ini mendaftarkan semua tabel
+
+TEST_MASTER_KEY_B64 = base64.b64encode(b"k" * 32).decode("ascii")
 
 @pytest.fixture
 def app(tmp_path):
@@ -10,6 +14,7 @@ def app(tmp_path):
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "PRIVATE_STORAGE_DIR": str(tmp_path / "storage"),
         "SECRET_KEY": "test",
+        "CRYPTO_MASTER_KEY_B64": TEST_MASTER_KEY_B64,
         "WTF_CSRF_ENABLED": False,
     })
     with app.app_context():

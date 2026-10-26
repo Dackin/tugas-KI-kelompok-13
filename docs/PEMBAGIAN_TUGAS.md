@@ -82,17 +82,19 @@ Detail lengkap: `docs/INTEGRASI_KRIPTOGRAFI.md`.
 
 | Method | Path | Akses | Body |
 |---|---|---|---|
-| GET/POST | `/auth/register` | publik | `username`, `password` |
-| GET/POST | `/auth/login` | publik | `username`, `password` |
-| POST | `/auth/logout` | login | — |
-| GET | `/resident/` | warga | — |
-| GET/POST | `/tickets/baru` | warga | `service_type`, `description` |
-| GET | `/tickets/<int:id>` | pemilik atau admin | — |
-| POST | `/tickets/<int:id>/pesan` | pemilik atau admin | `message` |
-| POST | `/tickets/<int:id>/dokumen` | pemilik | multipart `document` (algoritma tidak dipilih user, selalu `AES-256-GCM`) |
-| GET | `/documents/<int:id>/download` | pemilik atau admin | — |
-| GET | `/admin/tiket` | admin | — |
-| POST | `/admin/tiket/<int:id>/status` | admin | `status` |
+| GET/POST | `/auth/register` | publik | `username`, `full_name`, `address`, `password`, `confirm_password`, `admin_code` (opsional) |
+| GET/POST | `/auth/login` | publik | `username`, `password`, `remember_me` |
+| POST | `/auth/logout` | login | — (wajib CSRF) |
+| GET | `/warga/dashboard` | warga | — |
+| GET | `/warga/tiket` | warga | `?status=` opsional |
+| GET/POST | `/tiket/buat` | warga | `service_type`, `description`, `attachment` opsional, `confirm_information=yes` |
+| GET | `/tiket/<int:id>` | pemilik | — |
+| POST | `/tiket/<int:id>/lampiran` | pemilik | multipart `attachment` |
+| GET | `/tiket/<int:id>/lampiran/<int:doc>/unduh` | pemilik | — |
+| GET | `/admin/dashboard` | admin | `?status=&service_type=` opsional |
+| GET | `/admin/tiket/<int:id>` | admin | — |
+| POST | `/admin/tiket/<int:id>/status` | admin | `status`, `note` |
+| GET | `/admin/tiket/<int:id>/lampiran/<int:doc>/unduh` | admin | — |
 
 Denial akses: warga → resource warga lain = `403` atau `404`; warga → area admin = `403`;
 anonim → redirect ke `/auth/login`. Pemeriksaan kepemilikan dilakukan **sebelum**
@@ -113,11 +115,11 @@ role_required("admin")    # 403 untuk role lain, redirect untuk anonim
 
 Nama blueprint dan endpoint dipakai `default_dashboard_url()`:
 
-| Blueprint | Endpoint wajib |
+| Blueprint | Endpoint |
 |---|---|
-| `resident` | `resident.dashboard` |
-| `admin` | `admin.dashboard` |
-| `tickets` | `tickets.create`, `tickets.detail`, `tickets.upload`, `tickets.download` |
+| `resident` | `resident.dashboard`, `resident.ticket_list` |
+| `admin` | `admin.dashboard`, `admin.ticket_detail`, `admin.update_ticket_status`, `admin.download_attachment` |
+| `tickets` | `tickets.create_ticket`, `tickets.ticket_detail`, `tickets.upload_attachment`, `tickets.download_attachment` |
 
 Tanpa endpoint itu, login tetap jatuh ke `/` (fallback), tetapi navigasi
 pengguna jadi tidak jelas. Gunakan nama di atas.
@@ -133,9 +135,28 @@ dan `actor_user_id`.
 
 ### Status tiket
 
-`Diajukan` → `Diproses` → `Selesai` atau `Ditolak`.
+Nilai: `Diajukan`, `Diproses`, `Perlu Revisi`, `Selesai`, `Ditolak`.
+
+Transisi yang diizinkan (server menolak selain ini):
+
+| Dari | Boleh ke |
+|---|---|
+| `Diajukan` | `Diproses`, `Ditolak` |
+| `Diproses` | `Perlu Revisi`, `Selesai`, `Ditolak` |
+| `Perlu Revisi` | `Diajukan`, `Diproses`, `Ditolak` |
+| `Selesai` | — |
+| `Ditolak` | — |
+
+Setiap perubahan status menulis satu baris `AuditLog` (`action="ubah_status"`,
+`resource_type="ticket"`, `detail` berisi JSON status lama/baru/catatan).
 
 ### Halaman wajib menampilkan `ticket.service_type`
 
 Dashboard warga, detail tiket, dan antrean admin harus merender `service_type`,
 karena `tests/test_authorization.py` memakai field itu sebagai penanda.
+
+### Belum diimplementasikan
+
+`TicketMessage` sudah ada di model, tetapi belum ada route/UI balasan tiket.
+Jika diaktifkan, tambahkan `POST /tiket/<id>/pesan` dengan pemeriksaan
+kepemilikan yang sama seperti detail tiket.

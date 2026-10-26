@@ -1,14 +1,12 @@
 import os
 
-from flask import Flask
-from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, redirect, render_template
 from dotenv import load_dotenv
 
+from app.extensions import csrf, db, login_manager
+
 load_dotenv()
-db = SQLAlchemy()
-login_manager = LoginManager()
-login_manager.login_view = "auth.login"
+
 login_manager.login_message = "Silakan masuk terlebih dahulu."
 login_manager.login_message_category = "warning"
 login_manager.session_protection = "strong"
@@ -40,19 +38,36 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
+
     db.init_app(app)
     login_manager.init_app(app)
+    csrf.init_app(app)
     os.makedirs(app.config["PRIVATE_STORAGE_DIR"], exist_ok=True)
 
     # Import model sebelum create_all agar seluruh tabel terdaftar.
     from app import models  # noqa: F401
+    from app.admin.routes import admin_bp
     from app.auth.routes import auth_bp
+    from app.resident.routes import resident_bp
+    from app.tickets.routes import tickets_bp
 
-    app.register_blueprint(auth_bp)
+    for blueprint in (auth_bp, resident_bp, tickets_bp, admin_bp):
+        app.register_blueprint(blueprint)
 
     @app.get("/")
     def index():
-        return {"project": "Secure RT", "status": "starter"}
+        from flask_login import current_user
+
+        from app.auth.utils import default_dashboard_url
+
+        if current_user.is_authenticated:
+            return redirect(default_dashboard_url())
+        return render_template("index.html")
+
+    @app.errorhandler(403)
+    def forbidden(error):
+        return render_template("errors/403.html"), 403
+
     with app.app_context():
         db.create_all()
     return app
